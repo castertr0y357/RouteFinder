@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: routefinder-db-init
+data:
+  init.sql: |
+    SELECT 'CREATE DATABASE routefinder'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'routefinder')\gexec
+    GRANT ALL PRIVILEGES ON DATABASE routefinder TO postgres;
