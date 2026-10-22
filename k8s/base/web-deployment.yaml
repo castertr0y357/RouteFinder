@@ -55,6 +55,31 @@ spec:
             - containerPort: 8000
               name: http
           env:
+            - name: DATABASE_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: routefinder-config
+                  key: DATABASE_HOST
+            - name: DATABASE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: routefinder-config
+                  key: DATABASE_PORT
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: routefinder-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: routefinder-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: routefinder-secret
+                  key: POSTGRES_PASSWORD
             - name: DATABASE_URL
               value: "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(POSTGRES_DB)"
           envFrom:

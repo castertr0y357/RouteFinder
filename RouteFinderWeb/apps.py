@@ -36,19 +36,24 @@ class RoutefinderwebConfig(AppConfig):
         from django.db import connections
         
         db_conn = connections['default']
+        db_settings = db_conn.settings_dict
+        engine = db_settings.get('ENGINE', 'unknown')
+        db_name = db_settings.get('NAME', 'unknown')
+        db_host = db_settings.get('HOST') or 'local'
+        logger.info(f"[Startup] - [Database] - Initializing database connection using {engine} (Database: '{db_name}', Host: '{db_host}').")
+        
         max_retries = 3
         retry_delay = 2.0
         
         for attempt in range(1, max_retries + 1):
             try:
                 db_conn.cursor()
-                logger.info("[Startup] - [Database] - Database connection verified successfully.")
+                logger.info(f"[Startup] - [Database] - Database connection verified successfully ({engine} - Database: '{db_name}').")
                 break
             except OperationalError as e:
-                logger.warning(f"[Startup] - [Database] - Database connection failed (attempt {attempt}/{max_retries}). Retrying in {retry_delay}s... Error: {e}")
+                logger.warning(f"[Startup] - [Database] - Database connection to {engine} ('{db_name}' at {db_host}) failed (attempt {attempt}/{max_retries}). Retrying in {retry_delay}s... Error: {e}")
                 if attempt == max_retries:
                     logger.error("[Startup] - [Database] - Database connection failed permanently. Terminating startup.")
                     sys.exit(1)
                 time.sleep(retry_delay)
                 retry_delay *= 2
-

@@ -27,14 +27,19 @@ def main() -> None:
     from django.conf import settings
     
     # 2. Check Database Connection & Migrations
-    logger.info("Checking database connection...")
     from django.db import connections
     from django.db.utils import OperationalError
     
+    db_conn = connections['default']
+    db_settings = db_conn.settings_dict
+    engine = db_settings.get('ENGINE', 'unknown')
+    db_name = db_settings.get('NAME', 'unknown')
+    db_host = db_settings.get('HOST') or 'local'
+    logger.info(f"Checking database connection to {engine} (Database: '{db_name}', Host: '{db_host}')...")
+    
     try:
-        db_conn = connections['default']
         db_conn.cursor()
-        logger.info("Database connection successful.")
+        logger.info(f"Database connection successful ({engine} - Database: '{db_name}').")
     except OperationalError as e:
         logger.error(f"Database connection failed: {e}")
         sys.exit(1)

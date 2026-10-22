@@ -187,3 +187,76 @@ class ProfileViewTests(TestCase):
 
 
 
+
+
+
+class DatabaseConfigTests(TestCase):
+    def test_database_url_postgresql(self):
+        import environ
+        from RouteFinder.settings import get_database_config
+        env_mock = environ.Env()
+        with patch.dict('os.environ', {'DATABASE_URL': 'postgres://testuser:testpass@db.example.com:5432/testdb'}):
+            config = get_database_config(env_mock, '/tmp')
+            self.assertEqual(config['ENGINE'], 'django.db.backends.postgresql')
+            self.assertEqual(config['NAME'], 'testdb')
+            self.assertEqual(config['USER'], 'testuser')
+            self.assertEqual(config['PASSWORD'], 'testpass')
+            self.assertEqual(config['HOST'], 'db.example.com')
+            self.assertEqual(config['PORT'], 5432)
+
+    def test_database_url_sqlite(self):
+        import environ
+        from RouteFinder.settings import get_database_config
+        env_mock = environ.Env()
+        with patch.dict('os.environ', {'DATABASE_URL': 'sqlite:///custom.sqlite3'}):
+            config = get_database_config(env_mock, '/tmp')
+            self.assertEqual(config['ENGINE'], 'django.db.backends.sqlite3')
+            self.assertIn('custom.sqlite3', config['NAME'])
+
+    def test_individual_postgres_env_vars(self):
+        import environ
+        from RouteFinder.settings import get_database_config
+        env_mock = environ.Env()
+        env_vars = {
+            'DATABASE_HOST': 'postgres.internal',
+            'POSTGRES_DB': 'my_routefinder',
+            'POSTGRES_USER': 'pg_admin',
+            'POSTGRES_PASSWORD': 'supersecretpass',
+            'DATABASE_PORT': '5433',
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            config = get_database_config(env_mock, '/tmp')
+            self.assertEqual(config['ENGINE'], 'django.db.backends.postgresql')
+            self.assertEqual(config['NAME'], 'my_routefinder')
+            self.assertEqual(config['USER'], 'pg_admin')
+            self.assertEqual(config['PASSWORD'], 'supersecretpass')
+            self.assertEqual(config['HOST'], 'postgres.internal')
+            self.assertEqual(config['PORT'], '5433')
+
+    def test_unexpanded_k8s_template_falls_back_to_individual_postgres_vars(self):
+        import environ
+        from RouteFinder.settings import get_database_config
+        env_mock = environ.Env()
+        env_vars = {
+            'DATABASE_URL': 'postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(POSTGRES_DB)',
+            'DATABASE_HOST': 'db',
+            'POSTGRES_DB': 'routefinder',
+            'POSTGRES_USER': 'postgres',
+            'POSTGRES_PASSWORD': 'pgpass',
+            'DATABASE_PORT': '5432',
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            config = get_database_config(env_mock, '/tmp')
+            self.assertEqual(config['ENGINE'], 'django.db.backends.postgresql')
+            self.assertEqual(config['NAME'], 'routefinder')
+            self.assertEqual(config['USER'], 'postgres')
+            self.assertEqual(config['HOST'], 'db')
+
+    def test_zero_config_fallback_to_sqlite(self):
+        import environ
+        from RouteFinder.settings import get_database_config
+        env_mock = environ.Env()
+        with patch.dict('os.environ', {}, clear=True):
+            config = get_database_config(env_mock, '/tmp/base')
+            self.assertEqual(config['ENGINE'], 'django.db.backends.sqlite3')
+            self.assertIn('db.sqlite3', config['NAME'])

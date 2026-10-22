@@ -4,6 +4,11 @@
 - None (All current objectives met).
 
 ## 🚀 Completed Features
+- Fixed database engine resolution in `RouteFinder/settings.py` so PostgreSQL is properly recognized from either `DATABASE_URL`/`POSTGRES_URL` or individual Postgres environment variables (`POSTGRES_DB`/`DATABASE_NAME`, `POSTGRES_USER`/`DATABASE_USER`, `POSTGRES_PASSWORD`/`DATABASE_PASSWORD`, `DATABASE_HOST`/`POSTGRES_HOST`/`DB_HOST`, `DATABASE_PORT`/`POSTGRES_PORT`/`DB_PORT`).
+- Prevented unexpanded Kubernetes dependent environment variable templates (e.g. `postgres://$(POSTGRES_USER)...`) from breaking database initialization or causing unexpected fallback to SQLite.
+- Fixed Kubernetes `web-deployment.yaml` manifest by explicitly defining dependent environment variables using `valueFrom` prior to `DATABASE_URL`.
+- Enhanced database connection pre-flight logging in `RouteFinderWeb/apps.py` and `doctor.py` to clearly report the active database engine, host, and database name during startup diagnostics.
+- Added comprehensive unit tests in `RouteFinderWeb/tests.py` covering all database resolution scenarios (PostgreSQL URLs, SQLite URLs, individual Postgres variables, unexpanded K8s variables, zero-config local fallback).
 - Fixed issue where the AI settings page did not display the new service provider, API URL, and model fields due to the Service Worker caching the profile page.
 - Incremented PWA cache version to `routefinder-v4` to force a cache purge and update across client browsers.
 - Added comprehensive unit tests (`ProfileViewTests`) to verify the rendering of the AI settings fields on the profile page.
@@ -30,5 +35,5 @@
 - None
 
 ## 📌 Architectural Notes
-- Database: SQLite (local testing), PostgreSQL (docker production)
+- Database: SQLite (local testing fallback), PostgreSQL (production via DATABASE_URL or individual POSTGRES_* / DATABASE_* variables)
 - Verification Command: `$env:DATABASE_URL="sqlite:///db.sqlite3"; python manage.py test`

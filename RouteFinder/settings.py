@@ -76,8 +76,74 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'RouteFinder.wsgi.application'
 
+
+def get_database_config(env_inst, base_path):
+    """
+    Resolves the Django default database configuration.
+    Supports:
+    1. DATABASE_URL / POSTGRES_URL environment variables.
+    2. Individual Postgres parameters:
+       - Host: DATABASE_HOST, POSTGRES_HOST, DB_HOST
+       - Port: DATABASE_PORT, POSTGRES_PORT, DB_PORT (default: 5432)
+       - Name: POSTGRES_DB, DATABASE_NAME, DB_NAME (default: 'routefinder')
+       - User: POSTGRES_USER, DATABASE_USER, DB_USER (default: 'postgres')
+       - Password: POSTGRES_PASSWORD, DATABASE_PASSWORD, DB_PASSWORD
+    3. Fallback to SQLite for zero-config offline development and testing.
+    """
+    raw_db_url = env_inst('DATABASE_URL', default=None) or env_inst('POSTGRES_URL', default=None)
+
+    # Detect individual postgres variables
+    pg_host = (
+        env_inst('DATABASE_HOST', default=None)
+        or env_inst('POSTGRES_HOST', default=None)
+        or env_inst('DB_HOST', default=None)
+    )
+    pg_db = (
+        env_inst('POSTGRES_DB', default=None)
+        or env_inst('DATABASE_NAME', default=None)
+        or env_inst('DB_NAME', default=None)
+    )
+    pg_user = (
+        env_inst('POSTGRES_USER', default=None)
+        or env_inst('DATABASE_USER', default=None)
+        or env_inst('DB_USER', default=None)
+    )
+    pg_password = (
+        env_inst('POSTGRES_PASSWORD', default=None)
+        or env_inst('DATABASE_PASSWORD', default=None)
+        or env_inst('DB_PASSWORD', default=None)
+    )
+    pg_port = (
+        env_inst('DATABASE_PORT', default=None)
+        or env_inst('POSTGRES_PORT', default=None)
+        or env_inst('DB_PORT', default=None)
+        or '5432'
+    )
+
+    # If DATABASE_URL is provided and is NOT an unexpanded Kubernetes template like $(VAR)
+    if raw_db_url and not ('$(' in str(raw_db_url) and ')' in str(raw_db_url)):
+        return env_inst.db_url_config(raw_db_url)
+
+    # If postgres host or database name is provided, build postgres dictionary
+    if pg_host or pg_db:
+        return {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': pg_db or 'routefinder',
+            'USER': pg_user or 'postgres',
+            'PASSWORD': pg_password or '',
+            'HOST': pg_host or 'localhost',
+            'PORT': str(pg_port),
+        }
+
+    # Otherwise fallback to local SQLite
+    return {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(base_path, 'db.sqlite3'),
+    }
+
+
 DATABASES = {
-    'default': env.db('DATABASE_URL', default=f'sqlite:///{os.path.join(BASE_DIR, "db.sqlite3")}')
+    'default': get_database_config(env, BASE_DIR)
 }
 
 AUTH_PASSWORD_VALIDATORS = [
