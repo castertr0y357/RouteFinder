@@ -45,6 +45,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'RouteFinderWeb.observability.CorrelationIDMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -105,3 +106,48 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Observability, Loki Logging & Prometheus Configuration
+APP_LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "correlation": {
+            "()": "RouteFinderWeb.observability.CorrelationIDFilter",
+        },
+    },
+    "formatters": {
+        "json": {
+            "()": "RouteFinderWeb.observability.LokiJsonFormatter",
+        },
+        "console": {
+            "format": "[%(asctime)s] [%(correlation_id)s] [%(levelname)s] [%(name)s] - %(message)s",
+        },
+    },
+    "handlers": {
+        "stdout": {
+            "class": "logging.StreamHandler",
+            "filters": ["correlation"],
+            "formatter": "console" if os.environ.get("CONSOLE_PRETTY", "").lower() in ("true", "1") else "json",
+        },
+    },
+    "root": {
+        "handlers": ["stdout"],
+        "level": APP_LOG_LEVEL,
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["stdout"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "RouteFinderWeb": {
+            "handlers": ["stdout"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+    },
+}

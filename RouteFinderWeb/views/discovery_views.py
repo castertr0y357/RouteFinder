@@ -312,12 +312,15 @@ class ToggleRatingView(LoginRequiredMixin, View):
             obj, created = AddressRating.objects.get_or_create(user=request.user, address=address)
             if rating == 'neutral' and not obj.notes:
                 obj.delete()
+                logger.info(f"User {request.user.username} reset rating for '{address}'", extra={"action": "rating.toggle"})
             else:
                 obj.rating = rating
                 obj.save()
+                logger.info(f"User {request.user.username} set rating '{rating}' for '{address}'", extra={"action": "rating.toggle"})
                 
             return JsonResponse({'success': True, 'rating': rating})
         except Exception as e:
+            logger.error(f"ToggleRatingView failed for user {request.user.username}: {e}", exc_info=True, extra={"action": "rating.toggle"})
             return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -334,11 +337,14 @@ class GetZipCodeView(LoginRequiredMixin, View):
             zip_code = get_zip_from_coords(lat, lon)
             
             if zip_code:
+                logger.debug(f"Resolved zip code {zip_code} from coords ({lat}, {lon})", extra={"action": "location.get_zip"})
                 return JsonResponse({'success': True, 'zip_code': zip_code})
             else:
+                logger.warn(f"Could not determine zip code for coords ({lat}, {lon})", extra={"action": "location.get_zip"})
                 return JsonResponse({'error': 'Could not determine zip code'}, status=404)
                 
         except Exception as e:
+            logger.error(f"GetZipCodeView failed: {e}", exc_info=True, extra={"action": "location.get_zip"})
             return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -357,9 +363,11 @@ class HideSaleView(LoginRequiredMixin, View):
             )
             obj.is_hidden = True
             obj.save()
+            logger.info(f"User {request.user.username} hid sale at '{address}'", extra={"action": "sale.hide"})
             
             return JsonResponse({'success': True})
         except Exception as e:
+            logger.error(f"HideSaleView failed for user {request.user.username}: {e}", exc_info=True, extra={"action": "sale.hide"})
             return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -376,9 +384,12 @@ class GetAddressView(LoginRequiredMixin, View):
             address = get_address_from_coords(lat, lon)
             
             if address:
+                logger.debug(f"Resolved address '{address}' from coords ({lat}, {lon})", extra={"action": "location.get_address"})
                 return JsonResponse({'success': True, 'address': address})
             else:
+                logger.warn(f"Could not determine address for coords ({lat}, {lon})", extra={"action": "location.get_address"})
                 return JsonResponse({'error': 'Could not determine address'}, status=404)
                 
         except Exception as e:
+            logger.error(f"GetAddressView failed: {e}", exc_info=True, extra={"action": "location.get_address"})
             return JsonResponse({'error': str(e)}, status=500)

@@ -1,6 +1,10 @@
+import logging
+import time
 from typing import Any, Dict, List
 import googlemaps
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 class RouteSolver:
     def __init__(self, api_key: str) -> None:
@@ -16,6 +20,11 @@ class RouteSolver:
         Optionally includes a final leg back to the start_address.
         """
         import collections
+        start_time = time.time()
+        logger.info(
+            f"Solving route starting from '{start_address}' with {len(addresses_data)} waypoint(s), return_to_start={return_to_start}",
+            extra={"action": "route.solve"}
+        )
         buckets = collections.defaultdict(list)
         type_lookup = {start_address: 'home'}
         
@@ -73,6 +82,12 @@ class RouteSolver:
                 'type': 'home_return'
             })
             
+        duration = round((time.time() - start_time) * 1000, 2)
+        total_drive_time = sum(stop.get('drive_time_seconds', 0) for stop in optimized_route)
+        logger.info(
+            f"Route solved successfully: {len(optimized_route)} stops, total drive time ~{round(total_drive_time/60, 1)}m, calculated in {duration}ms",
+            extra={"action": "route.solve"}
+        )
         return optimized_route
 
     def _get_distance_matrix(self, locations: List[str]) -> List[List[float]]:
@@ -81,6 +96,7 @@ class RouteSolver:
         Returns a 2D list of distances (in seconds).
         """
         if self.mock_mode or not self.gmaps:
+            logger.debug(f"RouteSolver: generating mock distance matrix for {len(locations)} locations", extra={"action": "route.matrix_mock"})
             # Generate a mock distance matrix: 5 minutes (300 seconds) between each unique pair
             matrix: List[List[float]] = []
             for i in range(len(locations)):
@@ -94,10 +110,13 @@ class RouteSolver:
             return matrix
 
         matrix = []
+        logger.debug(f"Requesting Google Maps Distance Matrix for {len(locations)} locations", extra={"action": "route.matrix_api"})
         result = self.gmaps.distance_matrix(locations, locations, mode="driving", units="imperial")
         
-        if result['status'] != 'OK':
-            raise Exception("Error fetching distance matrix")
+        if result.get('status') != 'OK':
+            err_msg = f"Error fetching distance matrix from Google Maps: status={result.get('status')} error_message={result.get('error_message')}"
+            logger.error(err_msg, extra={"action": "route.matrix_api"})
+            raise Exception(err_msg)
 
         rows = result['rows']
         for row in rows:
