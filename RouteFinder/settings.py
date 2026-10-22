@@ -120,11 +120,11 @@ def get_database_config(env_inst, base_path):
         or '5432'
     )
 
-    # If DATABASE_URL is provided and is NOT an unexpanded Kubernetes template like $(VAR)
+    # 1. If DATABASE_URL is provided and is NOT an unexpanded $(VAR) template, use it
     if raw_db_url and not ('$(' in str(raw_db_url) and ')' in str(raw_db_url)):
         return env_inst.db_url_config(raw_db_url)
 
-    # If postgres host or database name is provided, build postgres dictionary
+    # 2. If Postgres host or database name is provided, build postgres dictionary
     if pg_host or pg_db:
         return {
             'ENGINE': 'django.db.backends.postgresql',
@@ -135,7 +135,7 @@ def get_database_config(env_inst, base_path):
             'PORT': str(pg_port),
         }
 
-    # Otherwise fallback to local SQLite
+    # 3. Otherwise fallback to local SQLite
     return {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': os.path.join(base_path, 'db.sqlite3'),
