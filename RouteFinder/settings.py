@@ -82,60 +82,46 @@ def get_database_config(env_inst, base_path):
     Resolves the Django default database configuration.
     Supports:
     1. DATABASE_URL / POSTGRES_URL environment variables.
-    2. Individual Postgres parameters:
-       - Host: DATABASE_HOST, POSTGRES_HOST, DB_HOST
-       - Port: DATABASE_PORT, POSTGRES_PORT, DB_PORT (default: 5432)
-       - Name: POSTGRES_DB, DATABASE_NAME, DB_NAME (default: 'routefinder')
-       - User: POSTGRES_USER, DATABASE_USER, DB_USER (default: 'postgres')
-       - Password: POSTGRES_PASSWORD, PGPASSWORD, DATABASE_PASSWORD, DB_PASSWORD
+    2. Individual Postgres parameters (case-insensitive lookup):
+       - Host: DATABASE_HOST, POSTGRES_HOST, PGHOST, DB_HOST
+       - Port: DATABASE_PORT, POSTGRES_PORT, PGPORT, DB_PORT (default: 5432)
+       - Name: POSTGRES_DB, DATABASE_NAME, PGDATABASE, DB_NAME (default: 'routefinder')
+       - User: POSTGRES_USER, DATABASE_USER, PGUSER, DB_USER (default: 'postgres')
+       - Password: POSTGRES_PASSWORD, PGPASSWORD, DATABASE_PASSWORD, DB_PASSWORD, PASSWORD
     3. Fallback to SQLite for zero-config offline development and testing.
     """
-    raw_db_url = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL') or env_inst('DATABASE_URL', default=None) or env_inst('POSTGRES_URL', default=None)
+    raw_db_url = (
+        os.environ.get('DATABASE_URL')
+        or os.environ.get('POSTGRES_URL')
+        or env_inst('DATABASE_URL', default=None)
+        or env_inst('POSTGRES_URL', default=None)
+    )
 
-    # Detect individual postgres variables (checking os.environ first, then env_inst)
-    pg_host = (
-        os.environ.get('DATABASE_HOST')
-        or os.environ.get('POSTGRES_HOST')
-        or os.environ.get('DB_HOST')
-        or env_inst('DATABASE_HOST', default=None)
-        or env_inst('POSTGRES_HOST', default=None)
-        or env_inst('DB_HOST', default=None)
-    )
-    pg_db = (
-        os.environ.get('POSTGRES_DB')
-        or os.environ.get('DATABASE_NAME')
-        or os.environ.get('DB_NAME')
-        or env_inst('POSTGRES_DB', default=None)
-        or env_inst('DATABASE_NAME', default=None)
-        or env_inst('DB_NAME', default=None)
-    )
-    pg_user = (
-        os.environ.get('POSTGRES_USER')
-        or os.environ.get('DATABASE_USER')
-        or os.environ.get('DB_USER')
-        or env_inst('POSTGRES_USER', default=None)
-        or env_inst('DATABASE_USER', default=None)
-        or env_inst('DB_USER', default=None)
-    )
-    pg_password = (
-        os.environ.get('POSTGRES_PASSWORD')
-        or os.environ.get('PGPASSWORD')
-        or os.environ.get('DATABASE_PASSWORD')
-        or os.environ.get('DB_PASSWORD')
-        or env_inst('POSTGRES_PASSWORD', default=None)
-        or env_inst('PGPASSWORD', default=None)
-        or env_inst('DATABASE_PASSWORD', default=None)
-        or env_inst('DB_PASSWORD', default=None)
-    )
-    pg_port = (
-        os.environ.get('DATABASE_PORT')
-        or os.environ.get('POSTGRES_PORT')
-        or os.environ.get('DB_PORT')
-        or env_inst('DATABASE_PORT', default=None)
-        or env_inst('POSTGRES_PORT', default=None)
-        or env_inst('DB_PORT', default=None)
-        or '5432'
-    )
+    def find_env(*keys):
+        for k in keys:
+            val = os.environ.get(k) or os.environ.get(k.lower())
+            if val is not None and str(val).strip() != '':
+                return str(val).strip()
+            try:
+                val = env_inst(k, default=None) or env_inst(k.lower(), default=None)
+                if val is not None and str(val).strip() != '':
+                    return str(val).strip()
+            except Exception:
+                pass
+        return None
+
+    pg_host = find_env('DATABASE_HOST', 'POSTGRES_HOST', 'PGHOST', 'DB_HOST')
+    pg_db = find_env('POSTGRES_DB', 'DATABASE_NAME', 'PGDATABASE', 'DB_NAME')
+    pg_user = find_env('POSTGRES_USER', 'DATABASE_USER', 'PGUSER', 'DB_USER')
+    pg_password = find_env('POSTGRES_PASSWORD', 'PGPASSWORD', 'DATABASE_PASSWORD', 'DB_PASSWORD', 'PASSWORD')
+    pg_port = find_env('DATABASE_PORT', 'POSTGRES_PORT', 'PGPORT', 'DB_PORT') or '5432'
+
+    # Fallback search for any environment variable containing 'password'
+    if not pg_password:
+        for k, v in os.environ.items():
+            if 'password' in k.lower() and v and str(v).strip() != '':
+                pg_password = str(v).strip()
+                break
 
     # 1. If DATABASE_URL is provided and is NOT an unexpanded $(VAR) template, use it
     if raw_db_url and not ('$(' in str(raw_db_url) and ')' in str(raw_db_url)):
@@ -145,11 +131,12 @@ def get_database_config(env_inst, base_path):
             db_conf['PASSWORD'] = pg_password
         if not db_conf.get('USER') and pg_user:
             db_conf['USER'] = pg_user
+        print(f"[DatabaseConfig] Resolved from DATABASE_URL: Engine={db_conf.get('ENGINE')}, Host={db_conf.get('HOST')}, DB={db_conf.get('NAME')}, User={db_conf.get('USER')}, Password length={len(db_conf.get('PASSWORD', '') or '')}")
         return db_conf
 
     # 2. If Postgres host, db, user, or password is provided, build postgres dictionary
     if pg_host or pg_db or pg_user or pg_password:
-        return {
+        db_conf = {
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': pg_db or 'routefinder',
             'USER': pg_user or 'postgres',
@@ -157,12 +144,16 @@ def get_database_config(env_inst, base_path):
             'HOST': pg_host or 'localhost',
             'PORT': str(pg_port),
         }
+        print(f"[DatabaseConfig] Resolved from discrete env vars: Engine={db_conf['ENGINE']}, Host={db_conf['HOST']}, DB={db_conf['NAME']}, User={db_conf['USER']}, Password length={len(db_conf['PASSWORD'])}")
+        return db_conf
 
     # 3. Otherwise fallback to local SQLite
-    return {
+    db_conf = {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': os.path.join(base_path, 'db.sqlite3'),
     }
+    print(f"[DatabaseConfig] Fallback to SQLite: {db_conf['NAME']}")
+    return db_conf
 
 
 DATABASES = {
