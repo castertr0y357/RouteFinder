@@ -40,7 +40,9 @@ class RoutefinderwebConfig(AppConfig):
         engine = db_settings.get('ENGINE', 'unknown')
         db_name = db_settings.get('NAME', 'unknown')
         db_host = db_settings.get('HOST') or 'local'
-        logger.info(f"[Startup] - [Database] - Initializing database connection using {engine} (Database: '{db_name}', Host: '{db_host}').")
+        db_user = db_settings.get('USER') or 'unknown'
+        has_pw = bool(db_settings.get('PASSWORD'))
+        logger.info(f"[Startup] - [Database] - Initializing database connection using {engine} (Database: '{db_name}', Host: '{db_host}', User: '{db_user}', Password set: {has_pw}).")
         
         max_retries = 3
         retry_delay = 2.0

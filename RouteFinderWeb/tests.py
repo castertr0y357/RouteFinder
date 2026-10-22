@@ -260,3 +260,31 @@ class DatabaseConfigTests(TestCase):
             config = get_database_config(env_mock, '/tmp/base')
             self.assertEqual(config['ENGINE'], 'django.db.backends.sqlite3')
             self.assertIn('db.sqlite3', config['NAME'])
+
+    def test_pgpassword_env_var(self):
+        import environ
+        from RouteFinder.settings import get_database_config
+        env_mock = environ.Env()
+        env_vars = {
+            'DATABASE_HOST': 'routefinder-db',
+            'PGPASSWORD': 'pgpass_from_env',
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            config = get_database_config(env_mock, '/tmp')
+            self.assertEqual(config['ENGINE'], 'django.db.backends.postgresql')
+            self.assertEqual(config['PASSWORD'], 'pgpass_from_env')
+            self.assertEqual(config['HOST'], 'routefinder-db')
+
+    def test_database_url_backfills_postgres_password(self):
+        import environ
+        from RouteFinder.settings import get_database_config
+        env_mock = environ.Env()
+        env_vars = {
+            'DATABASE_URL': 'postgres://postgres@routefinder-db:5432/routefinder',
+            'POSTGRES_PASSWORD': 'secret_password_123',
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            config = get_database_config(env_mock, '/tmp')
+            self.assertEqual(config['ENGINE'], 'django.db.backends.postgresql')
+            self.assertEqual(config['PASSWORD'], 'secret_password_123')
+            self.assertEqual(config['HOST'], 'routefinder-db')
