@@ -35,11 +35,11 @@ class UserProfile(models.Model):
 @receiver(post_save, sender=User)
 def create_user_profile(sender: Any, instance: User, created: bool, **kwargs: Any) -> None:
     if created:
-        UserProfile.objects.create(user=instance)
+        UserProfile.objects.get_or_create(user=instance)
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender: Any, instance: User, **kwargs: Any) -> None:
-    instance.userprofile.save()
+    UserProfile.objects.get_or_create(user=instance)
 
 class SavedRoute(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='saved_routes', db_index=True)

@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'mozilla_django_oidc',
     'RouteFinderWeb.apps.RoutefinderwebConfig',
 ]
 
@@ -143,6 +144,7 @@ def get_database_config(env_inst, base_path):
             'PASSWORD': pg_password or '',
             'HOST': pg_host or 'localhost',
             'PORT': str(pg_port),
+        'CONN_HEALTH_CHECKS': True,
         }
         print(f"[DatabaseConfig] Resolved from discrete env vars: Engine={db_conf['ENGINE']}, Host={db_conf['HOST']}, DB={db_conf['NAME']}, User={db_conf['USER']}, Password length={len(db_conf['PASSWORD'])}")
         return db_conf
@@ -180,10 +182,34 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 LOGIN_URL = 'login'
 
-AUTHENTICATION_BACKENDS = [
-    'RouteFinderWeb.backends.EmailBackend',
-    'django.contrib.auth.backends.ModelBackend',
-]
+# Reverse proxy SSL headers
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
+# OpenID Connect (Authentik) Configuration
+OIDC_ENABLED = os.environ.get('OIDC_ENABLED', 'False').lower() in ('true', '1', 't')
+OIDC_ADMIN_GROUP = os.environ.get('OIDC_ADMIN_GROUP', 'authentik Admins')
+OIDC_REQUIRED_GROUP = os.environ.get('OIDC_REQUIRED_GROUP', '')
+
+if OIDC_ENABLED:
+    AUTHENTICATION_BACKENDS = [
+        'RouteFinderWeb.backends.AuthentikOIDCBackend',
+    ]
+    OIDC_RP_CLIENT_ID = os.environ.get('OIDC_RP_CLIENT_ID', '')
+    OIDC_RP_CLIENT_SECRET = os.environ.get('OIDC_RP_CLIENT_SECRET', '')
+    OIDC_OP_AUTHORIZATION_ENDPOINT = os.environ.get('OIDC_OP_AUTHORIZATION_ENDPOINT', 'https://auth.castertr0y357.net/application/o/authorize/')
+    OIDC_OP_TOKEN_ENDPOINT = os.environ.get('OIDC_OP_TOKEN_ENDPOINT', 'https://auth.castertr0y357.net/application/o/token/')
+    OIDC_OP_USER_ENDPOINT = os.environ.get('OIDC_OP_USER_ENDPOINT', 'https://auth.castertr0y357.net/application/o/userinfo/')
+    OIDC_OP_JWKS_ENDPOINT = os.environ.get('OIDC_OP_JWKS_ENDPOINT', 'https://auth.castertr0y357.net/application/o/routefinder/jwks/')
+    OIDC_OP_LOGOUT_ENDPOINT = os.environ.get('OIDC_OP_LOGOUT_ENDPOINT', 'https://auth.castertr0y357.net/application/o/routefinder/end-session/')
+    OIDC_RP_SIGN_ALGO = 'RS256'
+    OIDC_RP_SCOPES = 'openid email profile'
+    LOGIN_URL = 'oidc_authentication_init'
+else:
+    AUTHENTICATION_BACKENDS = [
+        'RouteFinderWeb.backends.EmailBackend',
+        'django.contrib.auth.backends.ModelBackend',
+    ]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

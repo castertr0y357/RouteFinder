@@ -11,10 +11,16 @@ class RegisterView(View):
     template_name: str = 'RouteFinderWeb/register.html'
     
     def get(self, request: HttpRequest) -> HttpResponse:
+        from django.conf import settings
+        if getattr(settings, 'OIDC_ENABLED', False):
+            return redirect('login')
         form = forms.UserRegisterForm()
         return render(request, self.template_name, {'form': form})
         
     def post(self, request: HttpRequest) -> HttpResponse:
+        from django.conf import settings
+        if getattr(settings, 'OIDC_ENABLED', False):
+            return redirect('login')
         form = forms.UserRegisterForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
