@@ -248,34 +248,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 const isDisabled = sale.is_in_planner || sale.community_is_active;
                 const checkboxTitle = sale.is_in_planner ? 'Already in planner' : (sale.community_is_active ? `You already have a stop in ${sale.neighborhood_name}` : 'Add to route');
 
+                const distanceText = sale.distance_miles !== undefined ? ` &middot; <span style="color: var(--primary-color);">${sale.distance_miles} mi away</span>` : '';
+                const cleanDesc = (sale.desc || '').replace(/\*\*/g, '').trim();
+                const hasDetails = cleanDesc.length > 0 || sale.image_url;
+
                 card.innerHTML = `
-                    <div class="sale-card-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div style="flex: 1;">
+                    <div class="sale-card-header" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
+                        <div style="flex: 1; min-width: 0;">
                             ${badgesHtml}
-                            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.25rem; flex-wrap: wrap;">
-                                <h3 style="font-size: 1.15rem; margin: 0; line-height: 1.2;">${sale.title}</h3>
-                                <button type="button" onclick="event.stopPropagation(); hideSale('${sale.address}', this)" title="Hide listing" style="background: rgba(239, 68, 68, 0.1); border: none; color: var(--bust-color); font-size: 0.65rem; cursor: pointer; font-weight: 800; width: 44px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 4px; line-height: 1; letter-spacing: 0.05em; transition: all 0.2s; flex-shrink: 0;">HIDE</button>
-                            </div>
-                            <p style="color: var(--text-muted); font-size: 0.9rem; font-weight: 600; margin: 0;">📍 ${sale.address}</p>
+                            <h3 style="font-size: 1.15rem; margin: 0 0 0.25rem 0; line-height: 1.25;">${sale.title}</h3>
+                            <p style="color: var(--text-muted); font-size: 0.88rem; font-weight: 500; margin: 0;">📍 ${sale.address}${distanceText}</p>
                         </div>
-                        <div class="checkbox-wrapper" style="margin-left: 1.5rem;" onclick="event.stopPropagation();">
-                            <input type="checkbox" name="selected_sales" value="${sale.address}" title="${checkboxTitle}" style="width: 1.75rem; height: 1.75rem; cursor: ${isDisabled ? 'not-allowed' : 'pointer'}; accent-color: var(--primary-color); opacity: ${isDisabled ? '0.4' : '1'};" ${isDisabled ? 'disabled' : ''}>
+                        <div class="checkbox-wrapper" style="flex-shrink: 0;" onclick="event.stopPropagation();">
+                            <input type="checkbox" name="selected_sales" value="${sale.address}" style="display: none;" ${isDisabled ? 'disabled' : ''}>
+                            <button type="button" title="${checkboxTitle}" ${isDisabled ? 'disabled' : ''} onclick="const cb = this.previousElementSibling; cb.checked = !cb.checked; cb.dispatchEvent(new Event('change', { bubbles: true })); this.textContent = cb.checked ? '✓ Selected' : '+ Select'; this.style.background = cb.checked ? 'var(--primary-color)' : 'rgba(99, 102, 241, 0.12)'; this.style.color = cb.checked ? '#fff' : 'var(--primary-color)'; this.style.borderColor = cb.checked ? 'var(--primary-color)' : 'rgba(99, 102, 241, 0.35)';" style="width: auto !important; padding: 0.45rem 0.9rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; cursor: ${isDisabled ? 'not-allowed' : 'pointer'}; background: rgba(99, 102, 241, 0.12); color: var(--primary-color); border: 1px solid rgba(99, 102, 241, 0.35); box-shadow: none; opacity: ${isDisabled ? '0.4' : '1'}; white-space: nowrap;">${sale.is_in_planner ? 'In Planner' : '+ Select'}</button>
                         </div>
                     </div>
                     ${tagsHtml}
-                    ${sale.distance_miles !== undefined ? `<div style="font-size: 0.8rem; color: var(--primary-color); font-weight: 600; margin-bottom: 0.35rem;">📏 ${sale.distance_miles} mi away</div>` : ''}
-                    <div class="sale-desc-wrap" style="margin: 0.5rem 0;">
-                        <p class="sale-desc-text" style="margin: 0; font-size: 0.92rem; line-height: 1.5; color: rgba(248, 250, 252, 0.8); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">${(sale.desc || '').replace(/\*\*/g, '')}</p>
-                        ${(sale.desc || '').length > 180 ? `<button type="button" onclick="event.stopPropagation(); const p = this.previousElementSibling; const expanded = p.style.webkitLineClamp === 'unset'; p.style.webkitLineClamp = expanded ? '3' : 'unset'; this.textContent = expanded ? 'Show more' : 'Show less';" style="width: auto !important; background: none; border: none; color: var(--primary-color); font-size: 0.8rem; font-weight: 600; padding: 0.25rem 0 0; cursor: pointer; box-shadow: none;">Show more</button>` : ''}
-                    </div>
-                    <div style="display: flex; gap: 1rem; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 0.5rem;">
-                        <div style="display: flex; gap: 1rem; align-items: center;">
-                            <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">🕒 ${sale.time || ''}</span>
+                    ${hasDetails ? `
+                    <div style="margin-top: 0.65rem;" onclick="event.stopPropagation();">
+                        <button type="button" onclick="const panel = this.nextElementSibling; const open = panel.style.display === 'block'; panel.style.display = open ? 'none' : 'block'; this.textContent = open ? 'Details ▾' : 'Details ▴';" style="width: auto !important; background: none; border: none; color: var(--text-muted); font-size: 0.8rem; font-weight: 600; padding: 0; cursor: pointer; box-shadow: none;">Details ▾</button>
+                        <div style="display: none; margin-top: 0.5rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.03); border-radius: 0.6rem; border: 1px solid var(--border-color);">
+                            ${sale.image_url ? `<img src="${sale.image_url}" alt="${sale.title}" style="max-width: 100%; border-radius: 0.5rem; margin-bottom: 0.5rem;">` : ''}
+                            ${cleanDesc ? `<p style="margin: 0; font-size: 0.9rem; line-height: 1.5; color: rgba(248, 250, 252, 0.85);">${cleanDesc}</p>` : ''}
                         </div>
-                        ${sale.rating !== 'neutral' ? `
-                        <span style="padding: 0.25rem 0.75rem; border-radius: 99px; font-size: 0.75rem; font-weight: 800; background: ${sale.rating === 'great' ? 'rgba(251, 191, 36, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; color: ${sale.rating === 'great' ? 'var(--great-color)' : 'var(--bust-color)'}; letter-spacing: 0.02em; border: 1px solid currentColor;">
-                            ${sale.rating.toUpperCase()} HISTORY
-                        </span>` : ''}
+                    </div>` : ''}
+                    <div style="display: flex; gap: 1rem; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 0.85rem; margin-top: 0.75rem; flex-wrap: wrap;">
+                        <span style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">🕒 ${sale.time || ''}</span>
+                        <div style="display: flex; gap: 0.75rem; align-items: center;">
+                            ${sale.rating !== 'neutral' ? `
+                            <span style="padding: 0.2rem 0.65rem; border-radius: 99px; font-size: 0.72rem; font-weight: 800; background: ${sale.rating === 'great' ? 'rgba(251, 191, 36, 0.15)' : 'rgba(239, 68, 68, 0.15)'}; color: ${sale.rating === 'great' ? 'var(--great-color)' : 'var(--bust-color)'}; letter-spacing: 0.02em; border: 1px solid currentColor;">
+                                ${sale.rating.toUpperCase()} HISTORY
+                            </span>` : ''}
+                            <button type="button" onclick="event.stopPropagation(); hideSale('${sale.address}', this)" title="Hide listing" style="width: auto !important; background: none; border: none; color: var(--text-muted); font-size: 0.78rem; font-weight: 600; cursor: pointer; padding: 0.2rem 0.4rem; box-shadow: none; opacity: 0.75;">Hide</button>
+                        </div>
                     </div>
                 `;
                 grid.appendChild(card);
