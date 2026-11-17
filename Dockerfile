@@ -16,8 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    playwright install --with-deps chromium && \
+    chmod -R 755 /ms-playwright
 
 # Copy project with proper ownership
 COPY --chown=appuser:appuser . /app/

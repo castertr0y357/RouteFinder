@@ -255,6 +255,48 @@ def _get_estatesales_sales(zip_code: str, radius: int) -> List[Dict[str, Any]]:
     return sales
 
 
+def _get_craigslist_sales(zip_code: str, radius: int) -> List[Dict[str, Any]]:
+    """Fetch garage/yard sales from Craigslist using headless Chromium via Playwright."""
+    sales: List[Dict[str, Any]] = []
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        logger.warning("Playwright not installed; skipping Craigslist scrape.")
+        return sales
+
+    url = f"https://www.craigslist.org/search/gms?postal={zip_code}&search_distance={radius}"
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            )
+            page = context.new_page()
+            page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            page.wait_for_selector("li.cl-search-result, li.cl-static-search-result", timeout=8000)
+            cards = page.query_selector_all("li.cl-search-result, li.cl-static-search-result")
+            for card in cards[:30]:
+                title_el = card.query_selector("a.cl-app-anchor, a.titlestring, a")
+                title = title_el.inner_text().strip() if title_el else "Craigslist Garage Sale"
+                href = title_el.get_attribute("href") if title_el else url
+                meta_el = card.query_selector(".meta, .location")
+                loc_text = meta_el.inner_text().strip() if meta_el else zip_code
+                sales.append({
+                    'id': f"cl_{abs(hash(href or title))}",
+                    'title': title,
+                    'address': loc_text if loc_text else zip_code,
+                    'time': 'See listing',
+                    'start_time_sort': '9999-12-31 23:59',
+                    'desc': f"Craigslist garage sale ({loc_text})",
+                    'source_url': href or url,
+                })
+            browser.close()
+        logger.info(f"Craigslist returned {len(sales)} sales for {zip_code}")
+    except Exception as e:
+        logger.warning(f"Craigslist Playwright scrape failed for {zip_code}: {e}")
+    return sales
+
+
 def scrape_sales(zip_code: str, radius: int = 15) -> List[Dict[str, Any]]:
     """
     Primary entry point for garage sale discovery. 
@@ -290,6 +332,7 @@ def scrape_sales(zip_code: str, radius: int = 15) -> List[Dict[str, Any]]:
         # Submit all primary scraper tasks
         future_yss = executor.submit(_get_yardsalesearch_sales, zip_code, radius)
         future_es = executor.submit(_get_estatesales_sales, zip_code, radius)
+        future_cl = executor.submit(_get_craigslist_sales, zip_code, radius)
 
         combined_sales: List[Dict[str, Any]] = []
         try:
@@ -304,6 +347,12 @@ def scrape_sales(zip_code: str, radius: int = 15) -> List[Dict[str, Any]]:
             combined_sales.extend(es_sales)
         except Exception as e:
             logger.error(f"EstateSales.net scraper thread failed: {e}")
+
+        try:
+            cl_sales = future_cl.result(timeout=20)
+            combined_sales.extend(cl_sales)
+        except Exception as e:
+            logger.error(f"Craigslist scraper thread failed: {e}")
 
         # Deduplicate across all sources by normalized address
         seen_addresses = set()

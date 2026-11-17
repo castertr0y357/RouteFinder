@@ -8,3 +8,4 @@ django-environ
 whitenoise
 mozilla-django-oidc>=4.0.0
 geopy
+playwright==1.51.0
