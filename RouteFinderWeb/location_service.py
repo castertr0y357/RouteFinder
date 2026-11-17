@@ -94,13 +94,30 @@ def filter_sales_by_radius(sales: list, zip_code: str, radius: int) -> list:
         return sales
 
     from geopy.distance import geodesic
+    api_key = getattr(settings, 'GOOGLE_MAPS_API_KEY', None)
+    gmaps = googlemaps.Client(key=api_key) if api_key else None
+
     filtered = []
+    dropped = 0
+    missing = 0
     for item in sales:
         if not isinstance(item, dict):
             continue
         lat = item.get('lat')
         lng = item.get('lng') if item.get('lng') is not None else item.get('lon')
+        if (lat is None or lng is None) and item.get('address') and gmaps and not getattr(settings, 'MOCK_MODE', False):
+            try:
+                res = gmaps.geocode(item['address'])
+                if res:
+                    loc = res[0]['geometry']['location']
+                    lat, lng = float(loc['lat']), float(loc['lng'])
+                    item['lat'] = lat
+                    item['lng'] = lng
+            except Exception as e:
+                logger.debug(f"Address geocode failed for '{item.get('address')}': {e}")
+
         if lat is None or lng is None:
+            missing += 1
             filtered.append(item)
             continue
         try:
@@ -108,6 +125,13 @@ def filter_sales_by_radius(sales: list, zip_code: str, radius: int) -> list:
             if dist <= float(radius):
                 item['distance_miles'] = round(dist, 1)
                 filtered.append(item)
+            else:
+                dropped += 1
         except (ValueError, TypeError):
+            missing += 1
             filtered.append(item)
+
+    logger.info(
+        f"Radius filter for {zip_code} ({radius} mi): total={len(sales)}, kept={len(filtered)}, dropped={dropped}, missing_coords={missing}"
+    )
     return filtered
