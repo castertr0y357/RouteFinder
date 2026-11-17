@@ -273,7 +273,7 @@ def _get_craigslist_sales(zip_code: str, radius: int) -> List[Dict[str, Any]]:
             )
             page = context.new_page()
             page.goto(url, wait_until="domcontentloaded", timeout=15000)
-            page.wait_for_selector("li.cl-search-result, li.cl-static-search-result", timeout=8000)
+            page.wait_for_selector("li.cl-search-result, li.cl-static-search-result", state="attached", timeout=8000)
             cards = page.query_selector_all("li.cl-search-result, li.cl-static-search-result")
             for card in cards[:30]:
                 title_el = card.query_selector("a.cl-app-anchor, a.titlestring, a")
