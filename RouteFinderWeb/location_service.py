@@ -51,3 +51,63 @@ def get_address_from_coords(lat: float, lon: float) -> Optional[str]:
         
     return None
 
+
+
+def get_coords_from_zip(zip_code: str) -> Optional[tuple]:
+    """Resolve a US zip code to (lat, lon) coordinates."""
+    if not zip_code:
+        return None
+    if getattr(settings, 'MOCK_MODE', False):
+        return (36.0957, -79.2670)
+
+    api_key = getattr(settings, 'GOOGLE_MAPS_API_KEY', None)
+    if api_key:
+        try:
+            gmaps = googlemaps.Client(key=api_key)
+            results = gmaps.geocode(f"{zip_code}, USA")
+            if results:
+                loc = results[0]['geometry']['location']
+                return (float(loc['lat']), float(loc['lng']))
+        except Exception as e:
+            logger.warning(f"Google geocoding failed for zip {zip_code}: {e}")
+
+    try:
+        from geopy.geocoders import Nominatim
+        geolocator = Nominatim(user_agent="RouteFinder/1.0")
+        location = geolocator.geocode(f"{zip_code}, USA", timeout=5)
+        if location:
+            return (float(location.latitude), float(location.longitude))
+    except Exception as e:
+        logger.warning(f"Nominatim geocoding failed for zip {zip_code}: {e}")
+
+    return None
+
+
+def filter_sales_by_radius(sales: list, zip_code: str, radius: int) -> list:
+    """Filter scraped listings to those within `radius` miles of `zip_code`."""
+    if not sales or not zip_code:
+        return sales
+
+    origin = get_coords_from_zip(zip_code)
+    if not origin:
+        logger.warning(f"Could not geocode zip {zip_code}; skipping strict radius filter.")
+        return sales
+
+    from geopy.distance import geodesic
+    filtered = []
+    for item in sales:
+        if not isinstance(item, dict):
+            continue
+        lat = item.get('lat')
+        lng = item.get('lng') if item.get('lng') is not None else item.get('lon')
+        if lat is None or lng is None:
+            filtered.append(item)
+            continue
+        try:
+            dist = geodesic(origin, (float(lat), float(lng))).miles
+            if dist <= float(radius):
+                item['distance_miles'] = round(dist, 1)
+                filtered.append(item)
+        except (ValueError, TypeError):
+            filtered.append(item)
+    return filtered

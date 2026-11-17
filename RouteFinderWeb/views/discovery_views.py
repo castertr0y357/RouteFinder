@@ -12,7 +12,7 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from .. import forms
 from ..models import AddressRating, ScoutIntel
 from ..scraper import scrape_sales, scrape_thrift_stores
-from ..location_service import get_zip_from_coords, get_address_from_coords
+from ..location_service import get_zip_from_coords, get_address_from_coords, filter_sales_by_radius
 from ..ai_service import AIService
 
 logger = logging.getLogger(__name__)
@@ -208,6 +208,8 @@ class DiscoveryDataView(LoginRequiredMixin, View):
 
             if not isinstance(sales, list):
                 sales = []
+
+            sales = filter_sales_by_radius(sales, zip_code, radius)
                 
             # Apply sorting logic
             if sort_mode == 'time':

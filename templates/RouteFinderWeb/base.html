@@ -57,37 +57,76 @@
 </head>
 
 <body>
-    <header>
-        <div class="container" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0;">
-            <div style="display: flex; align-items: center; gap: 1.5rem;">
-                <a href="{% url 'main' %}" style="text-decoration: none; color: inherit;">
-                    <h1>RouteFinder</h1>
-                </a>
-                <nav style="display: flex; gap: 1rem;">
-                    <a href="{% url 'discover' %}" style="color: #fff; text-decoration: none; font-size: 0.9rem; font-weight: 600; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 99px; transition: all 0.2s ease; border: 1px solid rgba(255,255,255,0.1);" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">🔍 Discover</a>
-                </nav>
+    <header class="site-header">
+        <div class="container">
+            <div class="header-inner">
+                <div class="header-left">
+                    <a href="{% url 'main' %}" class="brand-link">
+                        <h1>RouteFinder</h1>
+                    </a>
+                    <nav class="desktop-nav" aria-label="Primary">
+                        <a href="{% url 'main' %}" class="nav-link {% if request.resolver_match.url_name == 'main' %}active{% endif %}">🗺️ Plan</a>
+                        <a href="{% url 'discover' %}" class="nav-link {% if request.resolver_match.url_name == 'discover' %}active{% endif %}">🔍 Discover</a>
+                    </nav>
+                </div>
+
+                <div class="header-right">
+                    {% if not google_maps_api_key and user.is_superuser %}
+                    <span title="Google Maps API Key is not configured" style="background: rgba(239, 68, 68, 0.12); color: var(--bust-color); font-size: 0.72rem; font-weight: 800; padding: 0.35rem 0.65rem; border-radius: 999px; border: 1px solid rgba(239, 68, 68, 0.4); white-space: nowrap;">⚠️ No Maps Key</span>
+                    {% endif %}
+
+                    <button type="button" class="icon-btn" onclick="openBriefing()" title="Quick Guide" aria-label="Quick Guide">?</button>
+
+                    {% if user.is_authenticated %}
+                    <div class="user-menu" id="user-menu">
+                        <button type="button" class="user-menu-trigger" id="user-menu-btn" aria-expanded="false" aria-haspopup="true" onclick="toggleUserMenu(event)">
+                            <span class="user-avatar">{{ user.username|slice:":1" }}</span>
+                            <span>{{ user.username }}</span>
+                            <span style="font-size: 0.65rem; opacity: 0.7;">▼</span>
+                        </button>
+                        <div class="user-dropdown" id="user-dropdown" role="menu">
+                            <a href="{% url 'profile' %}" class="dropdown-item" role="menuitem">👤 Profile &amp; Settings</a>
+                            {% if user.is_staff or user.is_superuser %}
+                            <a href="/admin/" class="dropdown-item" role="menuitem">🛡️ Admin Panel</a>
+                            {% endif %}
+                            <button type="button" id="install-pwa-btn" class="dropdown-item" style="display: none;" onclick="installPWA()" role="menuitem">📲 Install App</button>
+                            <div id="ios-install-tip" class="dropdown-item" style="display: none; font-size: 0.78rem; color: var(--text-muted); cursor: default;" title="Tap 'Share' and then 'Add to Home Screen' to install.">📲 iOS: Share &rarr; Add to Home</div>
+                            <div class="dropdown-divider"></div>
+                            <form action="{% url 'logout' %}" method="post" style="margin: 0;">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item danger" role="menuitem">🚪 Logout</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% else %}
+                    <a href="{% url 'login' %}" class="nav-link">Login</a>
+                    <a href="{% url 'register' %}" style="color: var(--primary-color); text-decoration: none; font-weight: 700; background: white; padding: 0.4rem 1rem; border-radius: 999px; font-size: 0.875rem; white-space: nowrap;">Register</a>
+                    {% endif %}
+                </div>
+
+                <button type="button" class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle navigation" aria-expanded="false" onclick="toggleMobileMenu()">☰</button>
             </div>
-            <div class="auth-links" style="display: flex; align-items: center; font-size: 0.9rem;">
-                <button type="button" onclick="openBriefing()" style="background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-color); padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800; margin-right: 1.25rem; cursor: pointer; letter-spacing: 0.05em; transition: all 0.2s ease;">ℹ️ BRIEFING</button>
-                <button id="install-pwa-btn" onclick="installPWA()" style="display: none; background: var(--primary-color); color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.75rem; font-weight: 800; margin-right: 1.25rem; cursor: pointer; letter-spacing: 0.05em; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);">📲 INSTALL APP</button>
-                <div id="ios-install-tip" style="display: none; background: rgba(255,255,255,0.05); color: var(--text-muted); padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.7rem; font-weight: 600; margin-right: 1.25rem; border: 1px solid var(--border-color); cursor: help;" title="Tap 'Share' and then 'Add to Home Screen' to install.">📲 iOS: TAP SHARE &rarr; [+]</div>
-                {% if not google_maps_api_key and user.is_superuser %}
-                <span style="background: rgba(239, 68, 68, 0.1); color: var(--bust-color); font-size: 0.75rem; font-weight: 800; padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--bust-color); letter-spacing: 0.05em; margin-right: 1.25rem;">⚠️ MISSING MAPS API KEY</span>
-                {% endif %}
-                {% if user.is_authenticated %}
-                {% if user.is_staff or user.is_superuser %}
-                <a href="/admin/" style="background-color: var(--bust-color); color: white; padding: 0.4rem 0.75rem; border-radius: 6px; text-decoration: none; font-weight: 700; margin-right: 1.25rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);">🛡️ Admin</a>
-                {% endif %}
-                <span style="color: var(--text-muted); margin-right: 1.25rem; font-weight: 500;">{{ user.username }}</span>
-                <a href="{% url 'profile' %}" style="color: white; margin-right: 1.25rem; text-decoration: none; font-weight: 600; opacity: 0.8; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">Profile</a>
-                <form action="{% url 'logout' %}" method="post" style="display: inline;">
-                    {% csrf_token %}
-                    <button type="submit" style="background: none; border: none; color: white; text-decoration: none; font-weight: 700; opacity: 0.6; transition: opacity 0.2s; cursor: pointer; padding: 0; font-family: inherit; font-size: inherit;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">Logout</button>
-                </form>
-                {% else %}
-                <a href="{% url 'login' %}" style="color: white; margin-right: 1.25rem; text-decoration: none; font-weight: 600;">Login</a>
-                <a href="{% url 'register' %}" style="color: var(--primary-color); text-decoration: none; font-weight: 700; background: white; padding: 0.4rem 1rem; border-radius: 6px;">Register</a>
-                {% endif %}
+
+            <div class="mobile-drawer" id="mobile-drawer">
+                <div class="mobile-drawer-links">
+                    <a href="{% url 'main' %}" class="dropdown-item {% if request.resolver_match.url_name == 'main' %}active{% endif %}">🗺️ Plan Route</a>
+                    <a href="{% url 'discover' %}" class="dropdown-item {% if request.resolver_match.url_name == 'discover' %}active{% endif %}">🔍 Discover Sales</a>
+                    <button type="button" class="dropdown-item" onclick="toggleMobileMenu(); openBriefing();">❓ Quick Guide</button>
+                    <div class="dropdown-divider"></div>
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'profile' %}" class="dropdown-item">👤 Profile ({{ user.username }})</a>
+                    {% if user.is_staff or user.is_superuser %}
+                    <a href="/admin/" class="dropdown-item">🛡️ Admin Panel</a>
+                    {% endif %}
+                    <form action="{% url 'logout' %}" method="post" style="margin: 0;">
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item danger">🚪 Logout</button>
+                    </form>
+                    {% else %}
+                    <a href="{% url 'login' %}" class="dropdown-item">🔑 Login</a>
+                    <a href="{% url 'register' %}" class="dropdown-item">✨ Register</a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </header>
@@ -112,64 +151,64 @@
             <p style="margin: 0; opacity: 0.7;">&copy; {% now "Y" %} RouteFinder. The Ultimate Garage Sale Intelligence Suite.</p>
         </div>
     </footer>
-    <!-- Tactical Briefing Modal -->
-    <div id="briefing-modal" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(2, 6, 23, 0.9); backdrop-filter: blur(12px); align-items: center; justify-content: center; padding: 1.5rem;">
-        <div class="card" style="max-width: 600px; width: 100%; padding: 2.5rem; border: 1px solid var(--border-color); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); position: relative; background: #0f172a;">
-            <button onclick="closeBriefing()" style="position: absolute; top: 1.5rem; right: 1.5rem; background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
+    <!-- Quick Guide Modal -->
+    <div id="briefing-modal" onclick="if (event.target === this) closeBriefing()" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(2, 6, 23, 0.8); align-items: center; justify-content: center; padding: 1.5rem;">
+        <div class="card" style="max-width: 560px; width: 100%; padding: 2.25rem; border: 1px solid var(--border-color); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); position: relative; background: #0f172a !important; backdrop-filter: none !important;">
+            <button onclick="closeBriefing()" aria-label="Close guide" style="position: absolute; top: 1.25rem; right: 1.25rem; width: auto !important; background: none; border: none; color: var(--text-muted); font-size: 1.5rem; line-height: 1; padding: 0.25rem 0.5rem; cursor: pointer; box-shadow: none;">&times;</button>
             
             <div id="briefing-content">
                 <!-- Step 1: Welcome -->
                 <div class="briefing-step" id="step-1">
-                    <h2 style="font-size: 2rem; margin-bottom: 1rem; color: var(--primary-color);">🛰️ Mission Briefing</h2>
-                    <p style="font-size: 1.1rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 2rem;">Welcome to <strong>RouteFinder 2.0</strong>. You've just been deployed with the most advanced scouting engine on the market. Let's get you combat-ready.</p>
+                    <h2 style="font-size: 1.75rem; margin-bottom: 0.75rem; color: var(--primary-color);">🗺️ Welcome to RouteFinder</h2>
+                    <p style="font-size: 1.05rem; line-height: 1.6; color: var(--text-muted); margin-bottom: 2rem;">Plan smarter garage sale and thrift store trips in minutes. Find nearby listings, spot the best stops, and get an optimized driving route.</p>
                     <div style="display: flex; justify-content: flex-end;">
-                        <button onclick="nextBriefingStep(2)" style="padding: 0.75rem 2rem; background: var(--primary-color); border: none; color: white; border-radius: 8px; font-weight: 800; cursor: pointer;">NEXT &rarr;</button>
+                        <button onclick="nextBriefingStep(2)" style="padding: 0.75rem 1.75rem; background: var(--primary-color); border: none; color: white; border-radius: 8px; font-weight: 700; cursor: pointer;">Next &rarr;</button>
                     </div>
                 </div>
 
                 <!-- Step 2: Discovery -->
                 <div class="briefing-step" id="step-2" style="display: none;">
-                    <h2 style="font-size: 1.75rem; margin-bottom: 1rem; color: var(--primary-color);">📡 Phase 1: Discovery</h2>
-                    <p style="margin-bottom: 1.5rem; line-height: 1.5;">Enter your <strong>Zip Code</strong> and <strong>Radius</strong> to begin a sweep. Toggle between <strong>Garage Sales</strong> and <strong>Thrift Stores</strong> depending on your mission objective.</p>
+                    <h2 style="font-size: 1.5rem; margin-bottom: 0.75rem; color: var(--primary-color);">🔍 1. Find Stops</h2>
+                    <p style="margin-bottom: 1.25rem; line-height: 1.6; color: var(--text-muted);">Head to the <strong>Discover</strong> tab, enter your <strong>Zip Code</strong> and <strong>Radius</strong>, and switch between <strong>Garage Sales</strong> and <strong>Thrift Stores</strong>.</p>
                     <ul style="list-style: none; padding: 0; margin-bottom: 2rem;">
-                        <li style="margin-bottom: 0.75rem; color: var(--text-muted);">✔️ <strong>Real-time Scraping</strong>: Pulls the latest data instantly.</li>
-                        <li style="margin-bottom: 0.75rem; color: var(--text-muted);">✔️ <strong>The Vault</strong>: Save your Friday night scout and load it instantly on Saturday morning.</li>
+                        <li style="margin-bottom: 0.65rem; color: var(--text-muted);">✔️ <strong>Live Listings</strong>: Pulls current local sales automatically.</li>
+                        <li style="margin-bottom: 0.65rem; color: var(--text-muted);">✔️ <strong>Save for Later</strong>: Bookmark your favorite stops ahead of the weekend.</li>
                     </ul>
                     <div style="display: flex; justify-content: space-between;">
-                        <button onclick="nextBriefingStep(1)" style="background: none; border: 1px solid var(--border-color); color: var(--text-muted); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer;">BACK</button>
-                        <button onclick="nextBriefingStep(3)" style="padding: 0.75rem 2rem; background: var(--primary-color); border: none; color: white; border-radius: 8px; font-weight: 800; cursor: pointer;">NEXT &rarr;</button>
+                        <button onclick="nextBriefingStep(1)" style="background: none; border: 1px solid var(--border-color); color: var(--text-muted); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer;">Back</button>
+                        <button onclick="nextBriefingStep(3)" style="padding: 0.75rem 1.75rem; background: var(--primary-color); border: none; color: white; border-radius: 8px; font-weight: 700; cursor: pointer;">Next &rarr;</button>
                     </div>
                 </div>
 
                 <!-- Step 3: Intelligence -->
                 <div class="briefing-step" id="step-3" style="display: none;">
-                    <h2 style="font-size: 1.75rem; margin-bottom: 1rem; color: var(--primary-color);">🧠 Phase 2: Intelligence</h2>
-                    <p style="margin-bottom: 1.5rem;">Our AI analyzes descriptions to find what others miss. Look for these tactical badges:</p>
-                    <div style="display: grid; gap: 1rem; margin-bottom: 2rem;">
+                    <h2 style="font-size: 1.5rem; margin-bottom: 0.75rem; color: var(--primary-color);">✨ 2. Smart Highlights</h2>
+                    <p style="margin-bottom: 1.25rem; color: var(--text-muted);">When AI is enabled in your Profile, listings are tagged to help you prioritize:</p>
+                    <div style="display: grid; gap: 0.85rem; margin-bottom: 2rem;">
                         <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid var(--bust-color); padding: 0.75rem; border-radius: 8px; font-size: 0.85rem;">
-                            <strong style="color: var(--bust-color);">⚠️ BUST CANDIDATE</strong>: AI predicts this listing might be a waste of time.
+                            <strong style="color: var(--bust-color);">⚠️ Low Priority</strong>: Listing looks thin or unlikely to match what you're after.
                         </div>
                         <div style="background: rgba(251, 191, 36, 0.1); border: 1px solid #fbbf24; padding: 0.75rem; border-radius: 8px; font-size: 0.85rem;">
-                            <strong style="color: #fbbf24;">✨ TREASURE DETECTED</strong>: High-value items found in description.
+                            <strong style="color: #fbbf24;">✨ Notable Finds</strong>: High-interest items mentioned in the description.
                         </div>
                         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 0.75rem; border-radius: 8px; font-size: 0.85rem;">
-                            <strong style="color: #10b981;">🎯 MATCH FOUND</strong>: This listing matches your personal wishlist items!
+                            <strong style="color: #10b981;">🎯 Wishlist Match</strong>: Matches items you've added to your personal wishlist.
                         </div>
                     </div>
                     <div style="display: flex; justify-content: space-between;">
-                        <button onclick="nextBriefingStep(2)" style="background: none; border: 1px solid var(--border-color); color: var(--text-muted); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer;">BACK</button>
-                        <button onclick="nextBriefingStep(4)" style="padding: 0.75rem 2rem; background: var(--primary-color); border: none; color: white; border-radius: 8px; font-weight: 800; cursor: pointer;">NEXT &rarr;</button>
+                        <button onclick="nextBriefingStep(2)" style="background: none; border: 1px solid var(--border-color); color: var(--text-muted); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer;">Back</button>
+                        <button onclick="nextBriefingStep(4)" style="padding: 0.75rem 1.75rem; background: var(--primary-color); border: none; color: white; border-radius: 8px; font-weight: 700; cursor: pointer;">Next &rarr;</button>
                     </div>
                 </div>
 
                 <!-- Step 4: Execution -->
                 <div class="briefing-step" id="step-4" style="display: none;">
-                    <h2 style="font-size: 1.75rem; margin-bottom: 1rem; color: var(--primary-color);">🏁 Phase 3: Execution</h2>
-                    <p style="margin-bottom: 1.5rem;">Select your targets and click <strong>IMPORT</strong>. Our Tactical Route Solver will calculate the most efficient path, accounting for travel time and stop duration.</p>
-                    <p style="margin-bottom: 2rem; color: var(--text-muted);">Ready to start the hunt?</p>
+                    <h2 style="font-size: 1.5rem; margin-bottom: 0.75rem; color: var(--primary-color);">🚗 3. Build Your Route</h2>
+                    <p style="margin-bottom: 1.25rem; line-height: 1.6; color: var(--text-muted);">Select the stops you want to visit and click <strong>Import</strong>. RouteFinder calculates the fastest order, factoring in drive time and how long you plan to spend at each stop.</p>
+                    <p style="margin-bottom: 2rem; color: var(--text-muted);">You're all set to start planning.</p>
                     <div style="display: flex; justify-content: space-between;">
-                        <button onclick="nextBriefingStep(3)" style="background: none; border: 1px solid var(--border-color); color: var(--text-muted); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer;">BACK</button>
-                        <button onclick="closeBriefing()" style="padding: 0.75rem 2rem; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; border-radius: 8px; font-weight: 800; cursor: pointer;">DISMISS & BEGIN</button>
+                        <button onclick="nextBriefingStep(3)" style="background: none; border: 1px solid var(--border-color); color: var(--text-muted); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer;">Back</button>
+                        <button onclick="closeBriefing()" style="padding: 0.75rem 1.75rem; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; border-radius: 8px; font-weight: 700; cursor: pointer;">Got It</button>
                     </div>
                 </div>
             </div>
@@ -183,7 +222,6 @@
         }
         function closeBriefing() {
             document.getElementById('briefing-modal').style.display = 'none';
-            localStorage.setItem('briefingCompleted', 'true');
         }
         function nextBriefingStep(stepNum) {
             document.querySelectorAll('.briefing-step').forEach(s => s.style.display = 'none');
@@ -191,10 +229,41 @@
             if (targetStep) targetStep.style.display = 'block';
         }
 
-        // Auto-show for new users
-        window.addEventListener('load', () => {
-            if (!localStorage.getItem('briefingCompleted')) {
-                setTimeout(openBriefing, 1000);
+        function toggleUserMenu(e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById('user-dropdown');
+            const btn = document.getElementById('user-menu-btn');
+            if (!dropdown || !btn) return;
+            const isOpen = dropdown.classList.toggle('open');
+            btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        }
+
+        function toggleMobileMenu() {
+            const drawer = document.getElementById('mobile-drawer');
+            const btn = document.getElementById('mobile-menu-btn');
+            if (!drawer || !btn) return;
+            const isOpen = drawer.classList.toggle('open');
+            btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            btn.textContent = isOpen ? '✕' : '☰';
+        }
+
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('user-menu');
+            const dropdown = document.getElementById('user-dropdown');
+            const btn = document.getElementById('user-menu-btn');
+            if (menu && dropdown && !menu.contains(e.target)) {
+                dropdown.classList.remove('open');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const dropdown = document.getElementById('user-dropdown');
+                const btn = document.getElementById('user-menu-btn');
+                if (dropdown) dropdown.classList.remove('open');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+                closeBriefing();
             }
         });
     </script>

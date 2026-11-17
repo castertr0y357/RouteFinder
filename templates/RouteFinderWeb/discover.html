@@ -24,7 +24,7 @@
         <input type="hidden" name="mode" value="{{ mode|default:'garage' }}">
         <input type="hidden" id="refresh-flag" name="refresh" value="false">
         <div style="flex: 1; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-            <input type="text" id="zip_code_input" name="zip_code" value="{{ zip_code|default:'' }}" placeholder="Enter Zip Code (e.g. 90210)" style="margin-bottom: 0; padding: 0.85rem 1rem; flex: 2; min-width: 150px;">
+            <input type="text" id="zip_code_input" name="zip_code" value="{{ zip_code|default:'' }}" placeholder="Zip code" style="margin-bottom: 0; padding: 0.85rem 1rem; flex: 2; min-width: 140px;">
             <select name="radius" style="margin-bottom: 0; flex: 1; min-width: 100px;">
                 <option value="5" {% if radius == '5' %}selected{% endif %}>5 miles</option>
                 <option value="10" {% if radius == '10' %}selected{% endif %}>10 miles</option>
@@ -263,7 +263,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
                     ${tagsHtml}
-                    <p style="margin: 0.5rem 0; font-size: 0.95rem; line-height: 1.5; color: rgba(248, 250, 252, 0.8);">${sale.desc || ''}</p>
+                    ${sale.distance_miles !== undefined ? `<div style="font-size: 0.8rem; color: var(--primary-color); font-weight: 600; margin-bottom: 0.35rem;">📏 ${sale.distance_miles} mi away</div>` : ''}
+                    <div class="sale-desc-wrap" style="margin: 0.5rem 0;">
+                        <p class="sale-desc-text" style="margin: 0; font-size: 0.92rem; line-height: 1.5; color: rgba(248, 250, 252, 0.8); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">${(sale.desc || '').replace(/\*\*/g, '')}</p>
+                        ${(sale.desc || '').length > 180 ? `<button type="button" onclick="const p = this.previousElementSibling; const expanded = p.style.webkitLineClamp === 'unset'; p.style.webkitLineClamp = expanded ? '3' : 'unset'; this.textContent = expanded ? 'Show more' : 'Show less';" style="width: auto !important; background: none; border: none; color: var(--primary-color); font-size: 0.8rem; font-weight: 600; padding: 0.25rem 0 0; cursor: pointer; box-shadow: none;">Show more</button>` : ''}
+                    </div>
                     <div style="display: flex; gap: 1rem; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 0.5rem;">
                         <div style="display: flex; gap: 1rem; align-items: center;">
                             <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">🕒 ${sale.time || ''}</span>

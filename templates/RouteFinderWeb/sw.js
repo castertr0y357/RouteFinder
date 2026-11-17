@@ -1,5 +1,5 @@
 {% load static %}
-const CACHE_NAME = 'routefinder-v4';
+const CACHE_NAME = 'routefinder-v5';
 const ASSETS = [
   '/',
   '{% static "RouteFinderWeb/style.css" %}',
