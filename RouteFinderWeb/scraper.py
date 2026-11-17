@@ -199,6 +199,62 @@ def _enrich_sale_details(sale: Dict[str, Any]) -> Dict[str, Any]:
     logger.info(f"Final Extracted Data: ID={sale.get('id')}, Time='{sale.get('time')}', Sort='{sale.get('start_time_sort')}'")
     return sale
 
+
+def _get_estatesales_sales(zip_code: str, radius: int) -> List[Dict[str, Any]]:
+    """Fetch estate sales from EstateSales.net using JSON-LD structured data."""
+    sales: List[Dict[str, Any]] = []
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    }
+    url = f"https://www.estatesales.net/sales/{zip_code}"
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        for script in soup.find_all('script', type='application/ld+json'):
+            try:
+                data = json.loads(script.string or '{}')
+            except (json.JSONDecodeError, TypeError):
+                continue
+            items = data if isinstance(data, list) else [data]
+            for item in items:
+                if not isinstance(item, dict) or item.get('@type') not in ('SaleEvent', 'Event'):
+                    continue
+                loc = item.get('location') or {}
+                addr_obj = loc.get('address') if isinstance(loc, dict) else {}
+                if isinstance(addr_obj, dict):
+                    parts = [
+                        addr_obj.get('streetAddress', ''),
+                        addr_obj.get('addressLocality', ''),
+                        addr_obj.get('addressRegion', ''),
+                        addr_obj.get('postalCode', ''),
+                    ]
+                    address = ', '.join(p for p in parts if p).strip()
+                else:
+                    address = str(addr_obj or '').strip()
+                if not address:
+                    continue
+                geo = loc.get('geo') if isinstance(loc, dict) else {}
+                lat = geo.get('latitude') if isinstance(geo, dict) else None
+                lng = geo.get('longitude') if isinstance(geo, dict) else None
+                start_date = (item.get('startDate') or '')[:10]
+                sales.append({
+                    'id': f"es_{abs(hash(address))}",
+                    'title': (item.get('name') or 'Estate Sale').strip(),
+                    'address': address,
+                    'time': start_date or 'See listing',
+                    'start_time_sort': f"{start_date} 08:00" if start_date else '9999-12-31 23:59',
+                    'desc': (item.get('description') or '').strip(),
+                    'source_url': item.get('url') or url,
+                    'lat': float(lat) if lat is not None else None,
+                    'lng': float(lng) if lng is not None else None,
+                })
+        logger.info(f"EstateSales.net returned {len(sales)} sales for {zip_code}")
+    except Exception as e:
+        logger.warning(f"EstateSales.net scrape failed for {zip_code}: {e}")
+    return sales
+
+
 def scrape_sales(zip_code: str, radius: int = 15) -> List[Dict[str, Any]]:
     """
     Primary entry point for garage sale discovery. 
@@ -233,24 +289,29 @@ def scrape_sales(zip_code: str, radius: int = 15) -> List[Dict[str, Any]]:
     with ThreadPoolExecutor(max_workers=10) as executor:
         # Submit all primary scraper tasks
         future_yss = executor.submit(_get_yardsalesearch_sales, zip_code, radius)
-        
+        future_es = executor.submit(_get_estatesales_sales, zip_code, radius)
+
+        combined_sales: List[Dict[str, Any]] = []
         try:
             base_sales = future_yss.result(timeout=15)
-            # Parallelize enrichment (fetching detail pages)
             enriched_sales = list(executor.map(_enrich_sale_details, base_sales))
-            
-            # Deduplicate by normalized address
-            seen_addresses = set()
-            unique_sales = []
-            for sale in enriched_sales:
-                norm_addr = sale['address'].lower().strip()
-                if norm_addr not in seen_addresses:
-                    seen_addresses.add(norm_addr)
-                    unique_sales.append(sale)
-            
-            all_sales.extend(unique_sales)
+            combined_sales.extend(enriched_sales)
         except Exception as e:
-            logger.error(f"Scraper thread failed: {e}")
+            logger.error(f"YardSaleSearch scraper thread failed: {e}")
+
+        try:
+            es_sales = future_es.result(timeout=15)
+            combined_sales.extend(es_sales)
+        except Exception as e:
+            logger.error(f"EstateSales.net scraper thread failed: {e}")
+
+        # Deduplicate across all sources by normalized address
+        seen_addresses = set()
+        for sale in combined_sales:
+            norm_addr = sale['address'].lower().strip()
+            if norm_addr and norm_addr not in seen_addresses:
+                seen_addresses.add(norm_addr)
+                all_sales.append(sale)
     
     # Demonstration Fallback
     if not all_sales:
