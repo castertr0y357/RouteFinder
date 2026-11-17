@@ -136,3 +136,30 @@ def filter_sales_by_radius(sales: list, zip_code: str, radius: int) -> list:
         f"Radius filter for {zip_code} ({radius} mi): total={len(sales)}, kept={len(filtered)}, dropped={dropped}, missing_coords={missing}"
     )
     return filtered
+
+
+def get_city_state_from_zip(zip_code: str) -> Optional[tuple]:
+    """Resolve a US zip code to lowercase (city_slug, state_abbr) for URLs like gsalr.com."""
+    if not zip_code:
+        return None
+    if getattr(settings, 'MOCK_MODE', False):
+        return ('mebane', 'nc')
+
+    api_key = getattr(settings, 'GOOGLE_MAPS_API_KEY', None)
+    if api_key:
+        try:
+            gmaps = googlemaps.Client(key=api_key)
+            results = gmaps.geocode(f"{zip_code}, USA")
+            if results:
+                city = state = ''
+                for comp in results[0].get('address_components', []):
+                    types = comp.get('types', [])
+                    if 'locality' in types:
+                        city = comp.get('long_name', '')
+                    elif 'administrative_area_level_1' in types:
+                        state = comp.get('short_name', '')
+                if city and state:
+                    return (city.lower().replace(' ', '-'), state.lower())
+        except Exception as e:
+            logger.warning(f"City/state geocode failed for {zip_code}: {e}")
+    return None

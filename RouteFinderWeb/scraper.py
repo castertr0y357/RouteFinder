@@ -297,6 +297,48 @@ def _get_craigslist_sales(zip_code: str, radius: int) -> List[Dict[str, Any]]:
     return sales
 
 
+def _get_gsalr_sales(zip_code: str, radius: int) -> List[Dict[str, Any]]:
+    """Fetch garage sales from gsalr.com by resolving zip_code to city-state."""
+    from .location_service import get_city_state_from_zip
+    sales: List[Dict[str, Any]] = []
+    city_state = get_city_state_from_zip(zip_code)
+    if not city_state:
+        return sales
+    city_slug, state_abbr = city_state
+    url = f"https://gsalr.com/garage-sales-{city_slug}-{state_abbr}.html"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    }
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        for card in soup.select('.sale, .listing, .card, article')[:25]:
+            title_el = card.select_one('h2, h3, .title, a')
+            title = title_el.get_text(strip=True) if title_el else 'Garage Sale'
+            addr_el = card.select_one('.address, .location, address')
+            address = addr_el.get_text(strip=True) if addr_el else f"{city_slug.replace('-', ' ').title()}, {state_abbr.upper()}"
+            desc_el = card.select_one('p, .description, .desc')
+            desc = desc_el.get_text(strip=True) if desc_el else ''
+            link_el = card.select_one('a[href]')
+            href = link_el['href'] if link_el else url
+            if href.startswith('/'):
+                href = f"https://gsalr.com{href}"
+            sales.append({
+                'id': f"gsalr_{abs(hash(href + address))}",
+                'title': title,
+                'address': address,
+                'time': 'See listing',
+                'start_time_sort': '9999-12-31 23:59',
+                'desc': desc,
+                'source_url': href,
+            })
+        logger.info(f"GSALR returned {len(sales)} sales for {zip_code} ({city_slug}-{state_abbr})")
+    except Exception as e:
+        logger.warning(f"GSALR scrape failed for {zip_code}: {e}")
+    return sales
+
+
 def scrape_sales(zip_code: str, radius: int = 15) -> List[Dict[str, Any]]:
     """
     Primary entry point for garage sale discovery. 
@@ -333,6 +375,7 @@ def scrape_sales(zip_code: str, radius: int = 15) -> List[Dict[str, Any]]:
         future_yss = executor.submit(_get_yardsalesearch_sales, zip_code, radius)
         future_es = executor.submit(_get_estatesales_sales, zip_code, radius)
         future_cl = executor.submit(_get_craigslist_sales, zip_code, radius)
+        future_gsalr = executor.submit(_get_gsalr_sales, zip_code, radius)
 
         combined_sales: List[Dict[str, Any]] = []
         try:
@@ -353,6 +396,12 @@ def scrape_sales(zip_code: str, radius: int = 15) -> List[Dict[str, Any]]:
             combined_sales.extend(cl_sales)
         except Exception as e:
             logger.error(f"Craigslist scraper thread failed: {e}")
+
+        try:
+            gsalr_sales = future_gsalr.result(timeout=15)
+            combined_sales.extend(gsalr_sales)
+        except Exception as e:
+            logger.error(f"GSALR scraper thread failed: {e}")
 
         # Deduplicate across all sources by normalized address
         seen_addresses = set()
