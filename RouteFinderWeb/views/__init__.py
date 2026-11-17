@@ -16,5 +16,6 @@ from .discovery_views import (
 )
 from .auth_views import (
     RegisterView,
-    ProfileView
+    ProfileView,
+    AITestConnectionView
 )

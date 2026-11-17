@@ -80,7 +80,12 @@
                     <div class="form-group">
                         <label for="{{ form.ai_model.id_for_label }}">{{ form.ai_model.label }}</label>
                         {{ form.ai_model }}
+                        <datalist id="ai-models-datalist"></datalist>
                         {% if form.ai_model.errors %}<div style="color: var(--bust-color); font-size: 0.85rem; margin-top: -0.75rem; margin-bottom: 1rem;">{{ form.ai_model.errors }}</div>{% endif %}
+                        <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                            <button type="button" id="test-ai-btn" onclick="testAIConnection()" style="width: auto !important; padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; background: rgba(99, 102, 241, 0.15); color: var(--primary-color); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 0.5rem; cursor: pointer; box-shadow: none;">🔌 Test Connection &amp; Fetch Models</button>
+                            <span id="ai-test-status" style="font-size: 0.85rem; color: var(--text-muted);"></span>
+                        </div>
                     </div>
 
                     <!-- API Key (Optional) -->
@@ -174,6 +179,52 @@ document.addEventListener('DOMContentLoaded', function() {
     const aiApiUrlWrapper = document.getElementById('ai-api-url-wrapper');
     const aiApiUrlLabel = document.getElementById('ai-api-url-label');
     const aiApiUrlInput = document.getElementById('{{ form.ai_api_url.id_for_label }}');
+    const aiModelInput = document.getElementById('{{ form.ai_model.id_for_label }}');
+    const aiApiKeyInput = document.getElementById('{{ form.ai_api_key.id_for_label }}');
+    if (aiModelInput) {
+        aiModelInput.setAttribute('list', 'ai-models-datalist');
+    }
+
+    async function testAIConnection() {
+        const btn = document.getElementById('test-ai-btn');
+        const status = document.getElementById('ai-test-status');
+        const datalist = document.getElementById('ai-models-datalist');
+        if (!btn || !status) return;
+        btn.disabled = true;
+        btn.textContent = 'Testing...';
+        status.style.color = 'var(--text-muted)';
+        status.textContent = 'Connecting to /v1/models...';
+        try {
+            const resp = await fetch('{% url "ai_test_connection" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    ai_api_url: aiApiUrlInput ? aiApiUrlInput.value : '',
+                    ai_api_key: aiApiKeyInput ? aiApiKeyInput.value : ''
+                })
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                status.style.color = '#10b981';
+                status.textContent = `Connected! Found ${data.models.length} model(s).`;
+                if (datalist) {
+                    datalist.innerHTML = data.models.map(m => `<option value="${m}">`).join('');
+                }
+            } else {
+                status.style.color = 'var(--bust-color)';
+                status.textContent = `Failed: ${data.error || 'Unknown error'}`;
+            }
+        } catch (err) {
+            status.style.color = 'var(--bust-color)';
+            status.textContent = `Error: ${err.message}`;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '🔌 Test Connection & Fetch Models';
+        }
+    }
     const aiApiKeyWrapper = document.getElementById('ai-api-key-wrapper');
 
     function updateDependentVisibility() {

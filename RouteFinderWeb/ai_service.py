@@ -50,6 +50,34 @@ class AIService:
             self.base_url = getattr(settings, 'OLLAMA_BASE_URL', 'http://host.docker.internal:11434')
             self.model = getattr(settings, 'OLLAMA_MODEL', 'gemma:4b')
 
+    @staticmethod
+    def _normalize_v1_base(url: str) -> str:
+        clean = (url or '').strip().rstrip('/')
+        if clean.endswith('/v1'):
+            clean = clean[:-3]
+        return clean
+
+    @classmethod
+    def test_connection(cls, base_url: str, api_key: str = '') -> Dict[str, Any]:
+        """Test an OpenAI-compatible endpoint via GET /v1/models and return available model IDs."""
+        root = cls._normalize_v1_base(base_url)
+        if not root:
+            return {'ok': False, 'error': 'API Base URL is required.', 'models': []}
+        headers: Dict[str, str] = {}
+        if api_key:
+            headers['Authorization'] = f'Bearer {api_key}'
+        try:
+            resp = requests.get(f'{root}/v1/models', headers=headers, timeout=10)
+            resp.raise_for_status()
+            payload = resp.json()
+            models = sorted(
+                m['id'] for m in payload.get('data', []) if isinstance(m, dict) and m.get('id')
+            )
+            return {'ok': True, 'models': models}
+        except Exception as e:
+            logger.warning(f"AI connection test failed for {root}: {e}")
+            return {'ok': False, 'error': str(e), 'models': []}
+
     def _call_raw(self, prompt: str, timeout: int = 50) -> Any:
         """Executes raw HTTP calls to Ollama or OpenAI with settings and custom thinking options."""
         if not self.ai_enabled:

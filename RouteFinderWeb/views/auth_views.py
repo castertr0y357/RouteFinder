@@ -45,3 +45,20 @@ class ProfileView(LoginRequiredMixin, View):
             messages.success(request, "Your profile has been updated.")
             return redirect('main')
         return render(request, self.template_name, {'form': form})
+
+
+class AITestConnectionView(LoginRequiredMixin, View):
+    def post(self, request: HttpRequest) -> HttpResponse:
+        import json
+        from django.http import JsonResponse
+        from ..ai_service import AIService
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'ok': False, 'error': 'Invalid JSON', 'models': []}, status=400)
+        api_url = (data.get('ai_api_url') or '').strip()
+        api_key = (data.get('ai_api_key') or '').strip()
+        if not api_key and hasattr(request.user, 'userprofile'):
+            api_key = getattr(request.user.userprofile, 'ai_api_key', '') or ''
+        result = AIService.test_connection(api_url, api_key)
+        return JsonResponse(result)
