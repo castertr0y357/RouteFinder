@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', function() {
             sales.forEach(sale => {
                 const card = document.createElement('div');
                 card.className = `card sale-card ${sale.is_bust_candidate ? 'bust-candidate' : ''}`;
-                card.id = `sale-${btoa(sale.address).replace(/=/g, '')}`;
+                card.id = `sale-${btoa(unescape(encodeURIComponent(sale.address))).replace(/=/g, '')}`;
                 card.style.cssText = `margin-bottom: 0; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; border-left: 6px solid ${
                     sale.rating === 'bust' ? 'var(--bust-color)' : 
                     sale.rating === 'great' ? 'var(--great-color)' : 'var(--primary-color)'
@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
         marker.addListener('click', () => {
             infoWindow.open(map, marker);
             // Highlight the card
-            const cardId = `sale-${btoa(sale.address).replace(/=/g, '')}`;
+            const cardId = `sale-${btoa(unescape(encodeURIComponent(sale.address))).replace(/=/g, '')}`;
             const card = document.getElementById(cardId);
             if (card) {
                 card.style.borderColor = "white";
