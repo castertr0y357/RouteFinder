@@ -309,7 +309,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    let sharedInfoWindow = null;
+
     function addMarker(sale, location) {
+        if (!sharedInfoWindow) {
+            sharedInfoWindow = new google.maps.InfoWindow();
+        }
         let color = "#6366f1"; // Primary
         if (sale.rating === 'bust' || sale.is_bust_candidate) color = "#ef4444";
         if (sale.rating === 'great' || sale.is_treasure) color = "#fbbf24";
@@ -332,17 +337,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
         bounds.extend(location);
         map.fitBounds(bounds);
+        google.maps.event.addListenerOnce(map, 'bounds_changed', () => {
+            if (map.getZoom() > 13) {
+                map.setZoom(13);
+            }
+        });
         markers.push(marker);
 
-        const infoWindow = new google.maps.InfoWindow({
-            content: `<div style="color: #1e293b; padding: 0.5rem;">
-                <strong style="display: block; margin-bottom: 0.25rem;">${sale.title}</strong>
-                <span style="font-size: 0.8rem; color: #64748b;">${sale.address}</span>
-            </div>`
-        });
+        const distLine = sale.distance_miles !== undefined ? `<div style="font-size: 0.78rem; color: #4f46e5; font-weight: 600; margin-top: 0.2rem;">${sale.distance_miles} mi away</div>` : '';
+        const timeLine = sale.time ? `<div style="font-size: 0.75rem; color: #475569; margin-top: 0.2rem;">🕒 ${sale.time}</div>` : '';
+        const popupHtml = `<div style="color: #1e293b; padding: 0.4rem; max-width: 240px;">
+            <strong style="display: block; margin-bottom: 0.2rem; font-size: 0.9rem;">${sale.title}</strong>
+            <span style="font-size: 0.78rem; color: #64748b;">${sale.address}</span>
+            ${distLine}
+            ${timeLine}
+        </div>`;
 
         marker.addListener('click', () => {
-            infoWindow.open(map, marker);
+            sharedInfoWindow.setContent(popupHtml);
+            sharedInfoWindow.open(map, marker);
             // Highlight the card
             const cardId = `sale-${btoa(unescape(encodeURIComponent(sale.address))).replace(/=/g, '')}`;
             const card = document.getElementById(cardId);

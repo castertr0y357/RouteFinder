@@ -227,4 +227,25 @@
         });
     }
 </script>
+{% if GOOGLE_MAPS_API_KEY %}
+<script>
+    function attachPlacesAutocomplete(input) {
+        if (!input || input.dataset.placesAttached || !window.google?.maps?.places) return;
+        input.dataset.placesAttached = '1';
+        new google.maps.places.Autocomplete(input, { types: ['address'], fields: ['formatted_address'] });
+    }
+
+    function initPlannerAutocomplete() {
+        attachPlacesAutocomplete(document.getElementById('start_address_input'));
+        document.querySelectorAll('input[name="address[]"]').forEach(attachPlacesAutocomplete);
+        const destContainer = document.getElementById('destinations-container');
+        if (destContainer) {
+            new MutationObserver(() => {
+                destContainer.querySelectorAll('input[name="address[]"]').forEach(attachPlacesAutocomplete);
+            }).observe(destContainer, { childList: true, subtree: true });
+        }
+    }
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=places&loading=async&callback=initPlannerAutocomplete" async defer></script>
+{% endif %}
 {% endblock %}
