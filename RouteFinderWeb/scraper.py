@@ -278,6 +278,8 @@ def _get_craigslist_sales(zip_code: str, radius: int) -> List[Dict[str, Any]]:
             for card in cards[:30]:
                 title_el = card.query_selector("a.cl-app-anchor, a.titlestring, a")
                 title = title_el.inner_text().strip() if title_el else "Craigslist Garage Sale"
+                if not any(k in title.lower() for k in ("garage", "yard", "estate", "moving", "rummage", "tag sale", "multi-family", "multi family")):
+                    continue
                 href = title_el.get_attribute("href") if title_el else url
                 meta_el = card.query_selector(".meta, .location")
                 loc_text = meta_el.inner_text().strip() if meta_el else zip_code
@@ -315,9 +317,13 @@ def _get_gsalr_sales(zip_code: str, radius: int) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(resp.text, 'html.parser')
         for card in soup.select('.sale, .listing, .card, article')[:25]:
             title_el = card.select_one('h2, h3, .title, a')
-            title = title_el.get_text(strip=True) if title_el else 'Garage Sale'
+            title = title_el.get_text(strip=True) if title_el else ''
             addr_el = card.select_one('.address, .location, address')
-            address = addr_el.get_text(strip=True) if addr_el else f"{city_slug.replace('-', ' ').title()}, {state_abbr.upper()}"
+            if not title or not addr_el or title.lower() in ('zoom out', 'zoom in'):
+                continue
+            address = addr_el.get_text(" ", strip=True).split('📅')[0].strip()
+            if not any(ch.isdigit() for ch in address):
+                continue
             desc_el = card.select_one('p, .description, .desc')
             desc = desc_el.get_text(strip=True) if desc_el else ''
             link_el = card.select_one('a[href]')
