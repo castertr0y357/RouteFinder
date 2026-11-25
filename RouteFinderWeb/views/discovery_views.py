@@ -250,6 +250,13 @@ class DiscoveryDataView(LoginRequiredMixin, View):
                         s['bust_reason'] = analysis.get('bust_reason', "")
                         s['is_wishlist_match'] = analysis.get('is_wishlist_match', False)
                         s['match_reason'] = analysis.get('match_reason', "")
+                        if wishlist and not s['is_wishlist_match']:
+                            haystack = f"{s.get('title', '')} {s.get('desc', '')}".lower()
+                            for kw in [w.strip() for w in wishlist.split(',') if w.strip()]:
+                                if kw.lower() in haystack:
+                                    s['is_wishlist_match'] = True
+                                    s['match_reason'] = f"Matched wishlist item: {kw}"
+                                    break
                         s['is_potential_goldmine'] = analysis.get('is_potential_goldmine', False)
                         s['profit_rating'] = analysis.get('profit_rating', 'None')
                         s['is_moving_sale'] = analysis.get('is_moving_sale', False)

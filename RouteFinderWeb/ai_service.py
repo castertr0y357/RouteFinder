@@ -133,78 +133,45 @@ class AIService:
         if self.thinking_enabled:
             prompt = f"[System instruction: Perform detailed logical reasoning with an effort level of {self.thinking_effort}% before returning the final response]\n{prompt}"
 
-        # Standard OpenAI Payload & Routing
-        if self.ai_provider == 'openai':
-            headers = {
-                "Content-Type": "application/json"
-            }
-            if self.api_key:
-                headers["Authorization"] = f"Bearer {self.api_key}"
+        # Standard OpenAI-Compatible Payload & Routing (works for Ollama, OpenAI, OpenRouter, LM Studio, vLLM, etc.)
+        headers = {
+            "Content-Type": "application/json"
+        }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
 
-            payload = {
-                "model": self.model,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "response_format": {"type": "json_object"}
-            }
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "response_format": {"type": "json_object"}
+        }
 
-            if self.thinking_enabled:
-                temp = round(max(0.1, min(1.0, 1.0 - (self.thinking_effort / 100.0))), 2)
-                payload["temperature"] = temp
+        if self.thinking_enabled:
+            temp = round(max(0.1, min(1.0, 1.0 - (self.thinking_effort / 100.0))), 2)
+            payload["temperature"] = temp
 
-            url = self.base_url
-            if not (url.endswith('/chat/completions') or url.endswith('/completions')):
-                url = f"{url.rstrip('/')}/chat/completions"
+        url = self.base_url.strip()
+        if not (url.endswith('/chat/completions') or url.endswith('/completions')):
+            url = f"{self._normalize_v1_base(url)}/v1/chat/completions"
 
-            try:
-                response = requests.post(
-                    url,
-                    headers=headers,
-                    json=payload,
-                    timeout=timeout
-                )
-                if response.status_code == 200:
-                    result_data = response.json()
-                    result_text = result_data['choices'][0]['message']['content']
-                    return json.loads(result_text)
-                else:
-                    logger.error(f"OpenAI compatible API returned status code {response.status_code}: {response.text}")
-            except Exception as e:
-                logger.error(f"OpenAI compatible API Call Error: {e}")
-            return None
-
-        # Native Ollama Payload & Routing
-        else:
-            payload = {
-                "model": self.model,
-                "prompt": prompt,
-                "stream": False,
-                "format": "json"
-            }
-
-            if self.thinking_enabled:
-                payload["think"] = True
-                temp = round(max(0.1, min(1.0, 1.0 - (self.thinking_effort / 100.0))), 2)
-                payload["options"] = {
-                    "temperature": temp
-                }
-                payload["thinking_budget"] = int(self.thinking_effort * 10)
-
-            try:
-                response = requests.post(
-                    f"{self.base_url.rstrip('/')}/api/generate",
-                    json=payload,
-                    timeout=timeout
-                )
-                if response.status_code == 200:
-                    result_text = response.json().get('response', '{}')
-                    return json.loads(result_text)
-                else:
-                    logger.error(f"Ollama returned status code {response.status_code}")
-            except Exception as e:
-                logger.error(f"Ollama Call Error: {e}")
-            return None
+        try:
+            response = requests.post(
+                url,
+                headers=headers,
+                json=payload,
+                timeout=timeout
+            )
+            if response.status_code == 200:
+                result_data = response.json()
+                result_text = result_data['choices'][0]['message']['content']
+                return json.loads(result_text)
+            else:
+                logger.error(f"OpenAI compatible API returned status code {response.status_code}: {response.text}")
+        except Exception as e:
+            logger.error(f"OpenAI compatible API Call Error: {e}")
+        return None
 
     def _call_ollama(self, prompt: str, timeout: int = 50) -> List[Dict[str, Any]]:
         """Shared logic for calling Ollama and adapting JSON responses into lists."""

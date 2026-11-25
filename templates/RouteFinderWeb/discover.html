@@ -14,8 +14,8 @@
     {% if saved_intel_exists %}
     <div style="margin-bottom: 2rem;">
         <button type="button" id="load-vault-btn" style="background: linear-gradient(135deg, #1e293b, #0f172a); border: 1px solid var(--primary-color); box-shadow: 0 0 20px rgba(99, 102, 241, 0.2); display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 1rem; border-radius: 0.75rem; color: var(--primary-color); font-weight: 800; letter-spacing: 0.05em; transition: all 0.2s ease; cursor: pointer; width: 100%;">
-            <span>📦 LOAD FROM THE VAULT</span>
-            <span style="font-size: 0.7rem; opacity: 0.6; font-weight: 400;">(Saved Intel Available)</span>
+            <span>📂 Load Saved Search</span>
+            <span style="font-size: 0.7rem; opacity: 0.6; font-weight: 400;">(Previous results available)</span>
         </button>
     </div>
     {% endif %}
@@ -136,11 +136,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const vaultBtn = document.getElementById('load-vault-btn');
     if (vaultBtn) {
         vaultBtn.addEventListener('click', () => {
-            vaultBtn.innerHTML = '📂 ACCESSING THE VAULT...';
+            vaultBtn.innerHTML = '📂 Loading saved results...';
             vaultBtn.style.opacity = '0.7';
             vaultBtn.disabled = true;
             document.getElementById('loading-state').style.display = 'block';
-            document.getElementById('loading-title').innerText = '📂 Vault Decryption';
+            document.getElementById('loading-title').innerText = '📂 Loading Saved Search';
             
             fetch(`{% url 'discovery_data' %}?mode=saved`)
                 .then(response => response.json())
@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.success) {
                         processDiscoveryResults(data.sales);
                     } else {
-                        alert('Vault Error: ' + data.error);
+                        alert('Error loading saved search: ' + data.error);
                         window.location.reload();
                     }
                 });
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {% if request.user.is_authenticated and request.user.userprofile.ai_enabled %}
         { time: 0, text: "Pulling latest listings from data sources...", title: "📡 Data Scouring", progress: 10 },
         { time: 2000, text: "Parsing addresses and sale times...", title: "🔍 Map Syncing", progress: 25 },
-        { time: 5000, text: "Gemma AI is analyzing descriptions for treasure...", title: "🧠 AI Analysis", progress: 45 },
+        { time: 5000, text: "AI is analyzing listing descriptions...", title: "🧠 AI Analysis", progress: 45 },
         { time: 10000, text: "Cross-referencing your personal wishlist...", title: "🎯 Match Hunting", progress: 70 },
         { time: 15000, text: "Clustering community neighborhood events...", title: "📂 Finalizing Groups", progress: 90 }
         {% else %}
@@ -203,7 +203,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 plotMarkers(sales);
             }
 
-            sales.forEach(sale => {
+            sales.forEach((sale, i) => {
                 const card = document.createElement('div');
                 card.className = `card sale-card ${sale.is_bust_candidate ? 'bust-candidate' : ''}`;
                 card.id = `sale-${btoa(unescape(encodeURIComponent(sale.address))).replace(/=/g, '')}`;
@@ -229,10 +229,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     badgesHtml += `<span class="bust-warning-label" title="${sale.bust_reason}">⚠️ AI PREDICTION: Likely a Bust</span>`;
                 }
                 if (sale.is_treasure) {
-                    badgesHtml += `<div class="treasure-badge" title="${sale.treasure_reason}">✨ TREASURE DETECTED</div>`;
+                    badgesHtml += `<div class="treasure-badge" title="${sale.treasure_reason}">✨ Notable Find</div>`;
                 }
                 if (sale.is_wishlist_match) {
-                    badgesHtml += `<div class="wishlist-badge" title="${sale.match_reason}">🎯 MATCH FOUND</div>`;
+                    badgesHtml += `<div class="wishlist-badge" title="${sale.match_reason}">🎯 Wishlist Match</div>`;
                 }
                 if (sale.is_community_event) {
                     badgesHtml += `<div class="wishlist-badge" style="background: rgba(249, 115, 22, 0.2); color: #fb923c; border-color: rgba(249, 115, 22, 0.3);">🏘️ COMMUNITY EVENT</div>`;
@@ -250,7 +250,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const distanceText = sale.distance_miles !== undefined ? ` &middot; <span style="color: var(--primary-color);">${sale.distance_miles} mi away</span>` : '';
                 const cleanDesc = (sale.desc || '').replace(/\*\*/g, '').trim();
-                const hasDetails = cleanDesc.length > 0 || sale.image_url;
+                const imagesList = (Array.isArray(sale.images) && sale.images.length > 0) ? sale.images : (sale.image_url ? [sale.image_url] : []);
+                const hasDetails = cleanDesc.length > 0 || imagesList.length > 0;
+                const galleryKey = `gal_${i}`;
+                window._saleGalleries = window._saleGalleries || {};
+                window._saleGalleries[galleryKey] = imagesList;
+
+                const thumbsHtml = imagesList.length > 0 ? `
+                    <div style="display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.4rem; margin-bottom: 0.65rem;">
+                        ${imagesList.map((imgUrl, idx) => `
+                            <img src="${imgUrl}" alt="${sale.title} photo ${idx + 1}" loading="lazy" onclick="openGallery('${galleryKey}', ${idx})" style="height: 88px; width: 112px; object-fit: cover; border-radius: 0.5rem; cursor: pointer; flex-shrink: 0; border: 1px solid var(--border-color); transition: transform 0.15s ease;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform='scale(1)'">
+                        `).join('')}
+                    </div>
+                ` : '';
 
                 card.innerHTML = `
                     <div class="sale-card-header" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
@@ -269,8 +281,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div style="margin-top: 0.65rem;" onclick="event.stopPropagation();">
                         <button type="button" onclick="const panel = this.nextElementSibling; const open = panel.style.display === 'block'; panel.style.display = open ? 'none' : 'block'; this.textContent = open ? 'Details ▾' : 'Details ▴';" style="width: auto !important; background: none; border: none; color: var(--text-muted); font-size: 0.8rem; font-weight: 600; padding: 0; cursor: pointer; box-shadow: none;">Details ▾</button>
                         <div style="display: none; margin-top: 0.5rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.03); border-radius: 0.6rem; border: 1px solid var(--border-color);">
-                            ${sale.image_url ? `<img src="${sale.image_url}" alt="${sale.title}" style="max-width: 100%; border-radius: 0.5rem; margin-bottom: 0.5rem;">` : ''}
+                            ${thumbsHtml}
                             ${cleanDesc ? `<p style="margin: 0; font-size: 0.9rem; line-height: 1.5; color: rgba(248, 250, 252, 0.85);">${cleanDesc}</p>` : ''}
+                            ${sale.source_url ? `<a href="${sale.source_url}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 0.5rem; font-size: 0.8rem; color: var(--primary-color); text-decoration: none; font-weight: 600;">View original listing &rarr;</a>` : ''}
                         </div>
                     </div>` : ''}
                     <div style="display: flex; gap: 1rem; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 0.85rem; margin-top: 0.75rem; flex-wrap: wrap;">
@@ -392,6 +405,59 @@ async function hideSale(address, btn) {
         }
     } catch (error) { console.error(error); }
 }
+</script>
+
+<div id="gallery-modal" onclick="if (event.target === this) closeGallery()" style="display: none; position: fixed; inset: 0; z-index: 10000; background: rgba(2, 6, 23, 0.9); align-items: center; justify-content: center; padding: 1.5rem;">
+    <button type="button" onclick="closeGallery()" aria-label="Close gallery" style="position: absolute; top: 1.25rem; right: 1.5rem; width: auto !important; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 1.5rem; line-height: 1; padding: 0.4rem 0.75rem; border-radius: 999px; cursor: pointer; box-shadow: none;">&times;</button>
+    <button type="button" id="gallery-prev" onclick="stepGallery(-1)" aria-label="Previous photo" style="position: absolute; left: 1.25rem; width: auto !important; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 1.75rem; line-height: 1; padding: 0.6rem 0.9rem; border-radius: 999px; cursor: pointer; box-shadow: none;">&#8249;</button>
+    <div style="max-width: 90vw; max-height: 85vh; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;" onclick="event.stopPropagation()">
+        <img id="gallery-main-img" src="" alt="Listing photo" style="max-width: 90vw; max-height: 78vh; object-fit: contain; border-radius: 0.75rem; box-shadow: 0 25px 50px rgba(0,0,0,0.6);">
+        <div id="gallery-counter" style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;"></div>
+    </div>
+    <button type="button" id="gallery-next" onclick="stepGallery(1)" aria-label="Next photo" style="position: absolute; right: 1.25rem; width: auto !important; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 1.75rem; line-height: 1; padding: 0.6rem 0.9rem; border-radius: 999px; cursor: pointer; box-shadow: none;">&#8250;</button>
+</div>
+
+<script>
+let _activeGallery = [];
+let _activeGalleryIdx = 0;
+
+function openGallery(key, idx) {
+    _activeGallery = (window._saleGalleries && window._saleGalleries[key]) || [];
+    if (!_activeGallery.length) return;
+    _activeGalleryIdx = idx || 0;
+    renderGallerySlide();
+    document.getElementById('gallery-modal').style.display = 'flex';
+}
+
+function closeGallery() {
+    document.getElementById('gallery-modal').style.display = 'none';
+}
+
+function stepGallery(delta) {
+    if (!_activeGallery.length) return;
+    _activeGalleryIdx = (_activeGalleryIdx + delta + _activeGallery.length) % _activeGallery.length;
+    renderGallerySlide();
+}
+
+function renderGallerySlide() {
+    const img = document.getElementById('gallery-main-img');
+    const counter = document.getElementById('gallery-counter');
+    const prev = document.getElementById('gallery-prev');
+    const next = document.getElementById('gallery-next');
+    if (img) img.src = _activeGallery[_activeGalleryIdx];
+    if (counter) counter.textContent = `${_activeGalleryIdx + 1} / ${_activeGallery.length}`;
+    const showArrows = _activeGallery.length > 1 ? 'inline-flex' : 'none';
+    if (prev) prev.style.display = showArrows;
+    if (next) next.style.display = showArrows;
+}
+
+document.addEventListener('keydown', (e) => {
+    const modal = document.getElementById('gallery-modal');
+    if (!modal || modal.style.display !== 'flex') return;
+    if (e.key === 'Escape') closeGallery();
+    else if (e.key === 'ArrowLeft') stepGallery(-1);
+    else if (e.key === 'ArrowRight') stepGallery(1);
+});
 </script>
 
 <script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&libraries=geometry&loading=async" async defer></script>

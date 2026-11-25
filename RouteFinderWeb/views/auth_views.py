@@ -42,8 +42,11 @@ class ProfileView(LoginRequiredMixin, View):
         form = forms.UserProfileForm(request.POST, instance=request.user.userprofile)
         if form.is_valid():
             form.save()
-            messages.success(request, "Your profile has been updated.")
-            return redirect('main')
+            messages.success(request, "Your settings have been saved.")
+            tab = request.POST.get('active_tab', '')
+            if tab in ('general', 'ai', 'account'):
+                return redirect(f"{request.path}#{tab}")
+            return redirect('profile')
         return render(request, self.template_name, {'form': form})
 
 

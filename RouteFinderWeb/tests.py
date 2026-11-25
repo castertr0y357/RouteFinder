@@ -98,7 +98,7 @@ class AIServiceTests(TestCase):
         # Mock successful JSON response
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.json.return_value = {"response": '{"is_bust_candidate": true}'}
+        mock_resp.json.return_value = {"choices": [{"message": {"content": '{"is_bust_candidate": true}'}}]}
         mock_post.return_value = mock_resp
         
         # Perform query
@@ -109,10 +109,10 @@ class AIServiceTests(TestCase):
         args, kwargs = mock_post.call_args
         payload = kwargs['json']
         
-        self.assertTrue(payload['think'])
-        self.assertEqual(payload['options']['temperature'], 0.2) # 1 - 80/100 = 0.2
-        self.assertEqual(payload['thinking_budget'], 800)
-        self.assertIn("Perform detailed logical reasoning with an effort level of 80%", payload['prompt'])
+        self.assertEqual(payload['temperature'], 0.2) # 1 - 80/100 = 0.2
+        self.assertIn("Perform detailed logical reasoning with an effort level of 80%", payload['messages'][0]['content'])
+
+
 
     @patch('requests.post')
     def test_openai_payload(self, mock_post):

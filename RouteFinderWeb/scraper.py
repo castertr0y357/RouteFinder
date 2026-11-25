@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 import requests
+import json
 import logging
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -200,6 +201,158 @@ def _enrich_sale_details(sale: Dict[str, Any]) -> Dict[str, Any]:
     return sale
 
 
+def _enrich_generic_details(sale: Dict[str, Any], _depth: int = 0) -> Dict[str, Any]:
+    """Fetch full description and hours from GSALR or EstateSales.net detail pages."""
+    url = sale.get('source_url')
+    if not url:
+        return sale
+
+    # If the overview description already points to a known external listing site, follow it directly
+    if _depth == 0:
+        import re
+        from urllib.parse import urlparse
+        desc_text = sale.get('desc') or ''
+        match = re.search(r'https?://[^\s<>"]+', desc_text)
+        if match:
+            ext_url = match.group(0).rstrip('.,;)')
+            host = (urlparse(ext_url).hostname or '').lower()
+            allowed_hosts = ('estatesales.net', 'estatesales.org', 'yardsalesearch.com', 'garagesalefinder.com')
+            if any(host == h or host.endswith('.' + h) for h in allowed_hosts) and ext_url != url:
+                ext_sale = dict(sale)
+                ext_sale['source_url'] = ext_url
+                ext_sale['desc'] = ''
+                enriched_ext = _enrich_generic_details(ext_sale, _depth=1)
+                if len(enriched_ext.get('desc') or '') > len(desc_text):
+                    sale['desc'] = enriched_ext['desc']
+                    sale['source_url'] = ext_url
+                    if enriched_ext.get('time') and sale.get('time') in ('See listing', ''):
+                        sale['time'] = enriched_ext['time']
+                    return sale
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    }
+    try:
+        resp = requests.get(url, headers=headers, timeout=8)
+        if resp.status_code != 200:
+            return sale
+        soup = BeautifulSoup(resp.text, 'html.parser')
+
+        # Prefer JSON-LD description & images if available
+        collected_images: List[str] = list(sale.get('images') or [])
+        if sale.get('image_url') and sale['image_url'] not in collected_images:
+            collected_images.append(sale['image_url'])
+
+        for script in soup.find_all('script', type='application/ld+json'):
+            try:
+                data = json.loads(script.string or '{}')
+                items = data if isinstance(data, list) else [data]
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    if item.get('description'):
+                        cand = str(item['description']).strip()
+                        if len(cand) > len(sale.get('desc') or ''):
+                            sale['desc'] = cand
+                    if item.get('startDate') and sale.get('time') == 'See listing':
+                        sale['time'] = str(item['startDate'])[:10]
+                    raw_imgs = item.get('image')
+                    if isinstance(raw_imgs, str):
+                        raw_imgs = [raw_imgs]
+                    if isinstance(raw_imgs, list):
+                        for img_item in raw_imgs:
+                            u = img_item.get('url') if isinstance(img_item, dict) else img_item
+                            if isinstance(u, str) and u.startswith('http') and u not in collected_images:
+                                collected_images.append(u)
+            except (json.JSONDecodeError, TypeError):
+                continue
+
+        # Also collect gallery images from HTML
+        for img_el in soup.select('img[src], img[data-src]'):
+            src = img_el.get('data-src') or img_el.get('src') or ''
+            if any(dom in src for dom in ('picturescdn.estatesales.net', 'tlstatic.com', 'yardsalesearch.com')) and src.startswith('http'):
+                if '/w100-' not in src and '/w120-' not in src and src not in collected_images:
+                    collected_images.append(src)
+
+        # For GSALR, fetch the ?gallery=1 page to grab all full-size photos
+        if 'gsalr.com' in url and '?gallery=1' not in url:
+            try:
+                g_resp = requests.get(f"{url}?gallery=1", headers=headers, timeout=8)
+                if g_resp.status_code == 200:
+                    g_soup = BeautifulSoup(g_resp.text, 'html.parser')
+                    for img_el in g_soup.select('img[src], img[data-src]'):
+                        src = img_el.get('data-src') or img_el.get('src') or ''
+                        if 'tlstatic.com' in src and src.startswith('http'):
+                            if '/w120-' in src or '/w100-' in src:
+                                import re as _re
+                                src = _re.sub(r'/w\d+-[^/]+/', '/w700-h500/', src)
+                            if src not in collected_images:
+                                collected_images.append(src)
+            except Exception as g_err:
+                logger.debug(f"GSALR gallery fetch skipped for {url}: {g_err}")
+
+        if collected_images:
+            sale['images'] = collected_images[:36]
+            sale['image_url'] = sale['images'][0]
+
+        # Fallback to HTML description blocks
+        for sel in ('[itemprop="description"]', '.sale-description', '.description', '#sale-description'):
+            el = soup.select_one(sel)
+            if el:
+                cand = el.get_text(" ", strip=True)
+                if len(cand) > len(sale.get('desc') or ''):
+                    sale['desc'] = cand
+                    break
+
+        # If description contains a link to a known external listing site, follow it once before meta fallback
+        if _depth == 0:
+            import re
+            from urllib.parse import urlparse
+            desc_text = sale.get('desc') or ''
+            match = re.search(r'https?://[^\s<>"]+', desc_text)
+            if match:
+                ext_url = match.group(0).rstrip('.,;)')
+                host = (urlparse(ext_url).hostname or '').lower()
+                allowed_hosts = ('estatesales.net', 'estatesales.org', 'yardsalesearch.com', 'garagesalefinder.com')
+                if any(host == h or host.endswith('.' + h) for h in allowed_hosts) and ext_url != url:
+                    ext_sale = dict(sale)
+                    ext_sale['source_url'] = ext_url
+                    ext_sale['desc'] = ''
+                    enriched_ext = _enrich_generic_details(ext_sale, _depth=1)
+                    if len(enriched_ext.get('desc') or '') > len(desc_text):
+                        sale['desc'] = enriched_ext['desc']
+                        sale['source_url'] = ext_url
+                        if enriched_ext.get('images'):
+                            sale['images'] = enriched_ext['images']
+                            sale['image_url'] = enriched_ext['images'][0]
+                        if enriched_ext.get('time') and sale.get('time') in ('See listing', ''):
+                            sale['time'] = enriched_ext['time']
+                        return sale
+
+        # Fallback to meta description / og:description
+        if not sale.get('desc') or len(sale.get('desc', '')) < 60:
+            for meta_attrs in ({'name': 'description'}, {'property': 'og:description'}):
+                meta_el = soup.find('meta', attrs=meta_attrs)
+                if meta_el and meta_el.get('content'):
+                    cand = meta_el['content'].strip()
+                    if len(cand) > len(sale.get('desc') or ''):
+                        sale['desc'] = cand
+                        break
+
+        # Extract hours/dates if still generic
+        if sale.get('time') in ('See listing', ''):
+            for sel in ('.dates', '.sale-dates', '.when', '.hours', '[itemprop="startDate"]'):
+                el = soup.select_one(sel)
+                if el:
+                    txt = el.get('content') or el.get_text(" | ", strip=True)
+                    if txt:
+                        sale['time'] = txt[:120]
+                        break
+    except Exception as e:
+        logger.debug(f"Detail enrichment skipped for {url}: {e}")
+    return sale
+
+
 def _get_estatesales_sales(zip_code: str, radius: int) -> List[Dict[str, Any]]:
     """Fetch estate sales from EstateSales.net using JSON-LD structured data."""
     sales: List[Dict[str, Any]] = []
@@ -315,29 +468,59 @@ def _get_gsalr_sales(zip_code: str, radius: int) -> List[Dict[str, Any]]:
         resp = requests.get(url, headers=headers, timeout=10)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, 'html.parser')
-        for card in soup.select('.sale, .listing, .card, article')[:25]:
-            title_el = card.select_one('h2, h3, .title, a')
+        for card in soup.select('div.listing.l-data')[:25]:
+            link_el = card.select_one('a.sale-title, a[itemprop="url"]')
+            title_el = link_el or card.select_one('h2, h3')
             title = title_el.get_text(strip=True) if title_el else ''
-            addr_el = card.select_one('.address, .location, address')
-            if not title or not addr_el or title.lower() in ('zoom out', 'zoom in'):
+            if not title or title.isdigit():
                 continue
-            address = addr_el.get_text(" ", strip=True).split('📅')[0].strip()
-            if not any(ch.isdigit() for ch in address):
+
+            street_el = card.select_one('[itemprop="streetAddress"]')
+            if street_el:
+                for icon in street_el.select('.ss-icon'):
+                    icon.decompose()
+                street = street_el.get_text(" ", strip=True)
+            else:
+                street = ''
+            city_el = card.select_one('[itemprop="addressLocality"]')
+            region_el = card.select_one('[itemprop="addressRegion"]')
+            zip_el = card.select_one('[itemprop="postalCode"]')
+            parts = [
+                street,
+                city_el.get_text(strip=True) if city_el else '',
+                ' '.join(p for p in [region_el.get_text(strip=True) if region_el else '', zip_el.get_text(strip=True) if zip_el else ''] if p),
+            ]
+            address = ', '.join(p for p in parts if p).strip()
+            if not address or 'address will be available' in address.lower() or not any(ch.isdigit() for ch in address):
                 continue
-            desc_el = card.select_one('p, .description, .desc')
-            desc = desc_el.get_text(strip=True) if desc_el else ''
-            link_el = card.select_one('a[href]')
-            href = link_el['href'] if link_el else url
+
+            desc_el = card.select_one('[itemprop="description"], .description, .desc')
+            desc = desc_el.get_text(" ", strip=True) if desc_el else ''
+            img_el = card.select_one('img[itemprop="image"]')
+            image_url = img_el.get('src') if img_el else None
+            href = link_el.get('href') if link_el and link_el.has_attr('href') else url
             if href.startswith('/'):
                 href = f"https://gsalr.com{href}"
+
+            lat_raw = card.get('data-lat')
+            lon_raw = card.get('data-lon')
+            try:
+                lat = float(lat_raw) if lat_raw else None
+                lng = float(lon_raw) if lon_raw else None
+            except (ValueError, TypeError):
+                lat, lng = None, None
+
             sales.append({
-                'id': f"gsalr_{abs(hash(href + address))}",
+                'id': f"gsalr_{card.get('data-id') or abs(hash(href + address))}",
                 'title': title,
                 'address': address,
                 'time': 'See listing',
                 'start_time_sort': '9999-12-31 23:59',
                 'desc': desc,
+                'image_url': image_url,
                 'source_url': href,
+                'lat': lat,
+                'lng': lng,
             })
         logger.info(f"GSALR returned {len(sales)} sales for {zip_code} ({city_slug}-{state_abbr})")
     except Exception as e:
@@ -393,7 +576,8 @@ def scrape_sales(zip_code: str, radius: int = 15) -> List[Dict[str, Any]]:
 
         try:
             es_sales = future_es.result(timeout=15)
-            combined_sales.extend(es_sales)
+            enriched_es = list(executor.map(_enrich_generic_details, es_sales))
+            combined_sales.extend(enriched_es)
         except Exception as e:
             logger.error(f"EstateSales.net scraper thread failed: {e}")
 
@@ -405,7 +589,8 @@ def scrape_sales(zip_code: str, radius: int = 15) -> List[Dict[str, Any]]:
 
         try:
             gsalr_sales = future_gsalr.result(timeout=15)
-            combined_sales.extend(gsalr_sales)
+            enriched_gsalr = list(executor.map(_enrich_generic_details, gsalr_sales))
+            combined_sales.extend(enriched_gsalr)
         except Exception as e:
             logger.error(f"GSALR scraper thread failed: {e}")
 

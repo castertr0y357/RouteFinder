@@ -66,8 +66,9 @@ class MainView(LoginRequiredMixin, View):
             profile = request.user.userprofile
             if profile.home_street:
                 parts = [profile.home_street]
-                if profile.home_zip: parts.append(profile.home_zip)
+                if getattr(profile, 'home_city', ''): parts.append(profile.home_city)
                 if profile.home_state: parts.append(profile.home_state)
+                if profile.home_zip: parts.append(profile.home_zip)
                 start_address = ", ".join(parts)
                 initial_data['start'] = start_address
             initial_data['stop_mins'] = profile.default_stop_mins

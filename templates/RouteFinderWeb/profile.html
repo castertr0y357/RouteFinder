@@ -10,39 +10,53 @@
             
             <!-- Tab Navigation Header -->
             <div class="profile-tabs-container">
-                <button type="button" id="tab-btn-address" class="profile-tab-btn active" onclick="switchTab('address')">📍 Base</button>
-                <button type="button" id="tab-btn-defaults" class="profile-tab-btn" onclick="switchTab('defaults')">🕒 Defaults</button>
+                <button type="button" id="tab-btn-general" class="profile-tab-btn active" onclick="switchTab('general')">📍 General</button>
                 <button type="button" id="tab-btn-ai" class="profile-tab-btn" onclick="switchTab('ai')">🧠 AI Settings</button>
+                <button type="button" id="tab-btn-account" class="profile-tab-btn" onclick="switchTab('account')">🔒 Account</button>
             </div>
+            <input type="hidden" name="active_tab" id="active-tab-input" value="general">
             
-            <!-- Tab 1: Address (Base) -->
-            <div id="tab-content-address" class="profile-tab-content">
+            <!-- Tab 1: General (Address + Defaults) -->
+            <div id="tab-content-general" class="profile-tab-content">
                 <div class="form-group">
                     <label for="{{ form.home_street.id_for_label }}">{{ form.home_street.label }}</label>
                     {{ form.home_street }}
                     {% if form.home_street.errors %}<div style="color: var(--bust-color); font-size: 0.85rem; margin-top: -0.75rem; margin-bottom: 1rem;">{{ form.home_street.errors }}</div>{% endif %}
                 </div>
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.75rem;">
+                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0.75rem;">
                     <div class="form-group">
-                        <label for="{{ form.home_zip.id_for_label }}">{{ form.home_zip.label }}</label>
-                        {{ form.home_zip }}
-                        {% if form.home_zip.errors %}<div style="color: var(--bust-color); font-size: 0.85rem; margin-top: -0.75rem; margin-bottom: 1rem;">{{ form.home_zip.errors }}</div>{% endif %}
+                        <label for="{{ form.home_city.id_for_label }}">{{ form.home_city.label }}</label>
+                        {{ form.home_city }}
+                        {% if form.home_city.errors %}<div style="color: var(--bust-color); font-size: 0.85rem; margin-top: -0.75rem; margin-bottom: 1rem;">{{ form.home_city.errors }}</div>{% endif %}
                     </div>
                     <div class="form-group">
                         <label for="{{ form.home_state.id_for_label }}">{{ form.home_state.label }}</label>
                         {{ form.home_state }}
                         {% if form.home_state.errors %}<div style="color: var(--bust-color); font-size: 0.85rem; margin-top: -0.75rem; margin-bottom: 1rem;">{{ form.home_state.errors }}</div>{% endif %}
                     </div>
+                    <div class="form-group">
+                        <label for="{{ form.home_zip.id_for_label }}">{{ form.home_zip.label }}</label>
+                        {{ form.home_zip }}
+                        {% if form.home_zip.errors %}<div style="color: var(--bust-color); font-size: 0.85rem; margin-top: -0.75rem; margin-bottom: 1rem;">{{ form.home_zip.errors }}</div>{% endif %}
+                    </div>
                 </div>
-            </div>
-            
-            <!-- Tab 2: Defaults -->
-            <div id="tab-content-defaults" class="profile-tab-content" style="display: none;">
-                <div class="form-group">
+                <div class="form-group" style="margin-top: 0.5rem;">
                     <label for="{{ form.default_stop_mins.id_for_label }}">{{ form.default_stop_mins.label }}</label>
                     {{ form.default_stop_mins }}
                     {% if form.default_stop_mins.errors %}<div style="color: var(--bust-color); font-size: 0.85rem; margin-top: -0.75rem; margin-bottom: 1rem;">{{ form.default_stop_mins.errors }}</div>{% endif %}
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -0.75rem; margin-bottom: 1.25rem;">Default minutes spent scouting each individual garage sale stop.</p>
+                    <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: -0.5rem; margin-bottom: 1.25rem;">Default minutes spent at each stop.</p>
+                </div>
+
+                <!-- Wishlist Tag Chips -->
+                <div class="form-group" style="margin-top: 0.5rem;">
+                    <label>Wishlist</label>
+                    <div style="display: none;">{{ form.looking_for }}</div>
+                    <div id="wishlist-chips" style="display: flex; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 0.6rem;"></div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="wishlist-add-input" placeholder="Add item (e.g. Vintage Pyrex, Tools)" autocomplete="off" style="margin-bottom: 0; flex: 1;">
+                        <button type="button" id="wishlist-add-btn" onclick="addWishlistChip()" style="width: auto !important; padding: 0 1rem; border-radius: 0.75rem; background: rgba(99, 102, 241, 0.15); color: var(--primary-color); border: 1px solid rgba(99, 102, 241, 0.35); font-weight: 700; font-size: 0.85rem; cursor: pointer; box-shadow: none; white-space: nowrap;">+ Add</button>
+                    </div>
+                    <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.45rem; margin-bottom: 0;">Listings matching your wishlist are highlighted automatically on Discover.</p>
                 </div>
             </div>
             
@@ -51,8 +65,8 @@
                 <!-- Switch for ai_enabled -->
                 <div class="switch-wrapper">
                     <div class="switch-info">
-                        <span class="switch-title">Enable Gemma AI Intel</span>
-                        <span class="switch-desc">Unlock badging, treasure alerts, community clustering, and auto-wishlist matching.</span>
+                        <span class="switch-title">Enable AI Highlights</span>
+                        <span class="switch-desc">Unlock smart tagging, treasure alerts, community clustering, and wishlist matching.</span>
                     </div>
                     <label class="switch-control" for="{{ form.ai_enabled.id_for_label }}">
                         {{ form.ai_enabled }}
@@ -62,84 +76,70 @@
 
                 <!-- AI Dependent settings container -->
                 <div id="ai-settings-dependent">
-                    <!-- Provider Selection -->
-                    <div class="form-group">
-                        <label for="{{ form.ai_provider.id_for_label }}">{{ form.ai_provider.label }}</label>
-                        {{ form.ai_provider }}
-                        {% if form.ai_provider.errors %}<div style="color: var(--bust-color); font-size: 0.85rem; margin-top: -0.75rem; margin-bottom: 1rem;">{{ form.ai_provider.errors }}</div>{% endif %}
-                    </div>
+                    <div style="display: none;">{{ form.ai_provider }}</div>
 
                     <!-- API Base URL -->
                     <div id="ai-api-url-wrapper" class="form-group">
-                        <label for="{{ form.ai_api_url.id_for_label }}" id="ai-api-url-label">{{ form.ai_api_url.label }}</label>
+                        <label for="{{ form.ai_api_url.id_for_label }}" id="ai-api-url-label">AI Endpoint</label>
                         {{ form.ai_api_url }}
                         {% if form.ai_api_url.errors %}<div style="color: var(--bust-color); font-size: 0.85rem; margin-top: -0.75rem; margin-bottom: 1rem;">{{ form.ai_api_url.errors }}</div>{% endif %}
                     </div>
 
-                    <!-- AI Model Name -->
-                    <div class="form-group">
-                        <label for="{{ form.ai_model.id_for_label }}">{{ form.ai_model.label }}</label>
-                        {{ form.ai_model }}
-                        <datalist id="ai-models-datalist"></datalist>
-                        {% if form.ai_model.errors %}<div style="color: var(--bust-color); font-size: 0.85rem; margin-top: -0.75rem; margin-bottom: 1rem;">{{ form.ai_model.errors }}</div>{% endif %}
-                        <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
-                            <button type="button" id="test-ai-btn" onclick="testAIConnection()" style="width: auto !important; padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; background: rgba(99, 102, 241, 0.15); color: var(--primary-color); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 0.5rem; cursor: pointer; box-shadow: none;">🔌 Test Connection &amp; Fetch Models</button>
-                            <span id="ai-test-status" style="font-size: 0.85rem; color: var(--text-muted);"></span>
-                        </div>
-                    </div>
-
                     <!-- API Key (Optional) -->
                     <div id="ai-api-key-wrapper" class="form-group">
-                        <label for="{{ form.ai_api_key.id_for_label }}">{{ form.ai_api_key.label }}</label>
+                        <label for="{{ form.ai_api_key.id_for_label }}">API Key (optional)</label>
                         {{ form.ai_api_key }}
                         {% if form.ai_api_key.errors %}<div style="color: var(--bust-color); font-size: 0.85rem; margin-top: -0.75rem; margin-bottom: 1rem;">{{ form.ai_api_key.errors }}</div>{% endif %}
                     </div>
 
-                    <!-- Switch for ai_thinking_enabled -->
-                    <div class="switch-wrapper">
-                        <div class="switch-info">
-                            <span class="switch-title">AI Deep Thinking</span>
-                            <span class="switch-desc">Allows Gemma to execute multi-step reasoning before classifying a listing.</span>
-                        </div>
-                        <label class="switch-control" for="{{ form.ai_thinking_enabled.id_for_label }}">
-                            {{ form.ai_thinking_enabled }}
-                            <span class="switch-slider"></span>
-                        </label>
+                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
+                        <button type="button" id="test-ai-btn" onclick="testAIConnection()" style="width: auto !important; padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; background: rgba(99, 102, 241, 0.15); color: var(--primary-color); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 0.5rem; cursor: pointer; box-shadow: none;">🔌 Test Connection &amp; Fetch Models</button>
+                        <span id="ai-test-status" style="font-size: 0.85rem; color: var(--text-muted);"></span>
                     </div>
 
-                    <!-- Slider for ai_thinking_effort -->
-                    <div id="ai-thinking-effort-wrapper" class="range-slider-wrapper">
-                        <div class="range-slider-header">
-                            <span class="range-slider-label">Thinking Effort Level</span>
-                            <span id="effort-value-badge" class="range-slider-badge">50%</span>
-                        </div>
-                        {{ form.ai_thinking_effort }}
-                        <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.5rem 0 0 0;">Higher effort yields high-fidelity insights but increases response latency.</p>
-                    </div>
-
-                    <!-- Textarea for looking_for -->
+                    <!-- AI Model Name -->
                     <div class="form-group">
-                        <label for="{{ form.looking_for.id_for_label }}">{{ form.looking_for.label }}</label>
-                        {{ form.looking_for }}
-                        {% if form.looking_for.errors %}<div style="color: var(--bust-color); font-size: 0.85rem; margin-top: -0.75rem; margin-bottom: 1rem;">{{ form.looking_for.errors }}</div>{% endif %}
-                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -0.75rem; margin-bottom: 1.25rem;">Comma-separated wishlist keywords. Gemma will instantly tag matches.</p>
+                        <label for="{{ form.ai_model.id_for_label }}">Model</label>
+                        <select id="ai-model-select" style="display: none; margin-bottom: 0.6rem;" onchange="if (this.value && aiModelInput) aiModelInput.value = this.value;"></select>
+                        {{ form.ai_model }}
+                        <datalist id="ai-models-datalist"></datalist>
+                        {% if form.ai_model.errors %}<div style="color: var(--bust-color); font-size: 0.85rem; margin-top: -0.75rem; margin-bottom: 1rem;">{{ form.ai_model.errors }}</div>{% endif %}
                     </div>
+
+                    <!-- Thinking + Effort on one row -->
+                    <div class="switch-wrapper" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span class="switch-title" style="margin: 0;">Thinking</span>
+                            <label class="switch-control" for="{{ form.ai_thinking_enabled.id_for_label }}">
+                                {{ form.ai_thinking_enabled }}
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                        <div id="ai-thinking-effort-wrapper" style="display: flex; align-items: center; gap: 0.6rem; min-width: 180px;">
+                            <label for="{{ form.ai_thinking_effort.id_for_label }}" style="margin: 0; white-space: nowrap; font-size: 0.78rem;">Effort</label>
+                            {{ form.ai_thinking_effort }}
+                        </div>
+                    </div>
+
+                    <!-- Wishlist moved to General tab -->
                 </div>
             </div>
+
+            <!-- Tab 3: Account -->
+            <div id="tab-content-account" class="profile-tab-content" style="display: none;">
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem;">Manage your login password and account security.</p>
+                <a href="{% url 'password_change' %}" style="display: block; text-align: center; background: rgba(255,255,255,0.03); color: white; padding: 1rem; border-radius: 0.75rem; text-decoration: none; font-weight: 700; border: 1px solid var(--border-color); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+                    🔐 Change Password
+                </a>
+            </div>
             
-            <div style="margin-top: 2rem;">
-                <input type="submit" value="Update Settings" style="padding: 1rem; font-weight: 700;">
+            <div id="save-settings-wrap" style="margin-top: 2rem;">
+                <input type="submit" value="Save Settings" style="padding: 1rem; font-weight: 700;">
             </div>
         </form>
         
-        <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color); text-align: center;">
-            <a href="{% url 'password_change' %}" style="display: block; background: rgba(255,255,255,0.03); color: white; padding: 1rem; border-radius: 0.75rem; text-decoration: none; font-weight: 700; border: 1px solid var(--border-color); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
-                🔐 Manage Security & Password
-            </a>
-        </div>
-        
-        <div style="margin-top: 2rem; text-align: center;">
-            <a href="{% url 'main' %}" style="color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 0.9rem;">&larr; Return to Planner</a>
+        <div style="margin-top: 1.75rem; text-align: center;">
+            <a href="{% url 'main' %}" style="color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 0.9rem;">&larr; Back to Planner</a>
         </div>
     </div>
 </div>
@@ -165,9 +165,27 @@ function switchTab(tabId) {
     if (targetBtn) {
         targetBtn.classList.add('active');
     }
+    const activeInput = document.getElementById('active-tab-input');
+    if (activeInput) activeInput.value = tabId;
+    const saveWrap = document.getElementById('save-settings-wrap');
+    if (saveWrap) saveWrap.style.display = (tabId === 'account') ? 'none' : 'block';
+    if (window.location.hash !== '#' + tabId) {
+        history.replaceState(null, '', '#' + tabId);
+    }
+    if (tabId === 'ai' && !window._aiAutoDiscovered) {
+        const urlEl = document.getElementById('{{ form.ai_api_url.id_for_label }}');
+        if (urlEl && urlEl.value.trim()) {
+            window._aiAutoDiscovered = true;
+            if (typeof testAIConnection === 'function') testAIConnection();
+        }
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    const initialHash = window.location.hash.replace('#', '');
+    if (['general', 'ai', 'account'].includes(initialHash)) {
+        switchTab(initialHash);
+    }
     const aiEnabledCheckbox = document.getElementById('{{ form.ai_enabled.id_for_label }}');
     const aiThinkingCheckbox = document.getElementById('{{ form.ai_thinking_enabled.id_for_label }}');
     const aiDependentContainer = document.getElementById('ai-settings-dependent');
@@ -178,6 +196,59 @@ document.addEventListener('DOMContentLoaded', function() {
     const aiProviderSelect = document.getElementById('{{ form.ai_provider.id_for_label }}');
     const aiApiUrlWrapper = document.getElementById('ai-api-url-wrapper');
     const aiApiUrlLabel = document.getElementById('ai-api-url-label');
+    const wishlistTextarea = document.getElementById('{{ form.looking_for.id_for_label }}');
+    const wishlistChipsEl = document.getElementById('wishlist-chips');
+    const wishlistAddInput = document.getElementById('wishlist-add-input');
+
+    function getWishlistItems() {
+        if (!wishlistTextarea) return [];
+        return wishlistTextarea.value.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    function renderWishlistChips() {
+        if (!wishlistChipsEl) return;
+        const items = getWishlistItems();
+        wishlistChipsEl.innerHTML = items.map((item, idx) => `
+            <span style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.7rem; border-radius: 999px; background: rgba(16, 185, 129, 0.14); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.82rem; font-weight: 600;">
+                <span>${item.replace(/</g, '&lt;')}</span>
+                <button type="button" onclick="removeWishlistChip(${idx})" aria-label="Remove ${item}" style="width: auto !important; background: none; border: none; color: #34d399; cursor: pointer; padding: 0; font-size: 0.95rem; line-height: 1; box-shadow: none;">&times;</button>
+            </span>
+        `).join('');
+    }
+
+    window.addWishlistChip = function() {
+        if (!wishlistAddInput || !wishlistTextarea) return;
+        const raw = wishlistAddInput.value.split(',').map(s => s.trim()).filter(Boolean);
+        if (!raw.length) return;
+        const existing = getWishlistItems();
+        raw.forEach(item => {
+            if (!existing.some(e => e.toLowerCase() === item.toLowerCase())) {
+                existing.push(item);
+            }
+        });
+        wishlistTextarea.value = existing.join(', ');
+        wishlistAddInput.value = '';
+        renderWishlistChips();
+    };
+
+    window.removeWishlistChip = function(idx) {
+        if (!wishlistTextarea) return;
+        const items = getWishlistItems();
+        items.splice(idx, 1);
+        wishlistTextarea.value = items.join(', ');
+        renderWishlistChips();
+    };
+
+    if (wishlistAddInput) {
+        wishlistAddInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                window.addWishlistChip();
+            }
+        });
+    }
+    renderWishlistChips();
+
     const aiApiUrlInput = document.getElementById('{{ form.ai_api_url.id_for_label }}');
     const aiModelInput = document.getElementById('{{ form.ai_model.id_for_label }}');
     const aiApiKeyInput = document.getElementById('{{ form.ai_api_key.id_for_label }}');
@@ -213,6 +284,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (datalist) {
                     datalist.innerHTML = data.models.map(m => `<option value="${m}">`).join('');
                 }
+                const modelSelect = document.getElementById('ai-model-select');
+                if (modelSelect && data.models.length > 0) {
+                    const currentVal = aiModelInput ? aiModelInput.value.trim() : '';
+                    const selectedModel = data.models.includes(currentVal) ? currentVal : data.models[0];
+                    modelSelect.innerHTML = data.models.map(m => `<option value="${m}" ${m === selectedModel ? 'selected' : ''}>${m}</option>`).join('');
+                    modelSelect.style.display = 'block';
+                    if (aiModelInput) {
+                        aiModelInput.value = selectedModel;
+                        aiModelInput.style.display = 'none';
+                    }
+                }
             } else {
                 status.style.color = 'var(--bust-color)';
                 status.textContent = `Failed: ${data.error || 'Unknown error'}`;
@@ -225,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.textContent = '🔌 Test Connection & Fetch Models';
         }
     }
-    const aiApiKeyWrapper = document.getElementById('ai-api-key-wrapper');
+    window.testAIConnection = testAIConnection;
 
     function updateDependentVisibility() {
         if (aiEnabledCheckbox && aiDependentContainer) {
@@ -235,29 +317,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateThinkingEffortVisibility() {
         if (aiThinkingCheckbox && aiThinkingEffortWrapper) {
-            aiThinkingEffortWrapper.style.display = aiThinkingCheckbox.checked ? 'block' : 'none';
-        }
-    }
-
-    function updateEffortBadge() {
-        if (effortSlider && effortBadge) {
-            effortBadge.innerText = effortSlider.value + '%';
+            aiThinkingEffortWrapper.style.display = aiThinkingCheckbox.checked ? 'flex' : 'none';
         }
     }
 
     function updateProviderVisibility() {
-        if (aiProviderSelect) {
-            const provider = aiProviderSelect.value;
-            if (provider === 'openai') {
-                if (aiApiKeyWrapper) aiApiKeyWrapper.style.display = 'block';
-                if (aiApiUrlLabel) aiApiUrlLabel.innerText = 'OpenAI Base URL';
-                if (aiApiUrlInput) aiApiUrlInput.placeholder = 'e.g. https://api.openai.com/v1';
-            } else {
-                if (aiApiKeyWrapper) aiApiKeyWrapper.style.display = 'none';
-                if (aiApiUrlLabel) aiApiUrlLabel.innerText = 'Ollama API URL';
-                if (aiApiUrlInput) aiApiUrlInput.placeholder = 'e.g. http://localhost:11434';
-            }
-        }
+        // Unified OpenAI-compatible mode: keep AI Endpoint and API Key always visible
     }
 
     if (aiEnabledCheckbox) {

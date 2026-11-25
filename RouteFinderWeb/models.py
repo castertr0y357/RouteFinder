@@ -8,7 +8,8 @@ from django.dispatch import receiver
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, db_index=True)
-    home_street = models.TextField(blank=True, help_text="Street address and City")
+    home_street = models.TextField(blank=True, help_text="Street address")
+    home_city = models.CharField(max_length=100, blank=True)
     home_zip = models.CharField(max_length=10, blank=True)
     home_state = models.CharField(max_length=2, blank=True)
     default_stop_mins = models.IntegerField(default=15, help_text="Default minutes spent at each individual garage sale.")

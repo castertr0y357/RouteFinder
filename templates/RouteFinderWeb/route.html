@@ -35,7 +35,7 @@
     </div>
 
     <div style="margin-top: 3rem; text-align: center;">
-        <a href="{% url 'main' %}" style="color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 0.95rem;">&larr; SCRAP THE ITINERARY & START OVER</a>
+        <a href="{% url 'main' %}" style="color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 0.95rem;">&larr; Back to Route Planner</a>
     </div>
 </div>
 
@@ -135,7 +135,7 @@ function renderItinerary(itinerary) {
             ${metaHtml}
 
             <div style="display: flex; flex-wrap: wrap; gap: 1.25rem; color: var(--text-muted); font-size: 0.85rem; font-weight: 600; text-transform: uppercase; margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem;">
-                ${isFirst ? '<span style="color: var(--garage-color);">🏁 STARTING BASE</span>' : 
+                ${isFirst ? '<span style="color: var(--garage-color);">🏁 START</span>' : 
                   isLast ? '<span style="color: #f97316;">🏡 RETURN HOME</span>' : 
                   `<span style="display: flex; align-items: center; gap: 0.35rem;"><span style="color: var(--primary-color);">🚗</span> ${step.drive_time_str} DRIVE</span>`}
                 
